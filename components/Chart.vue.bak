@@ -38,12 +38,15 @@
 			</div>
 
 			<div class="graph-container">
-				<div class="bar" v-for="item in components">
-					<div class="progress-estimate">
-						
-					</div>
-					<span>{{ item.type }}</span>
-
+				<div class="actual-progress">
+					<div>Actual Progress</div>
+					<div class="progress" v-for="n in 5">{{ n }}</div>
+				</div>
+				<div class="bars">
+					<div class="bar" v-for="n in 20" :style="{ left: `${n*2.5*indentationLevel}rem` }">{{`${n*5}%`}}</div>
+				</div>
+				<div class="graph">
+					<div class="graph-bar" v-for="component in components" :key="component.guid"></div>
 				</div>
 			</div>
 			
@@ -92,14 +95,15 @@ export default {
 			editorShown: false,
 			components: [],
 			indentationLevel: 1,
-			currentComponent: {
-
-			},
+			maxIndentation: 0,
 		}
 	},
 	watch: {
 		components() {
 			// console.log(this.components);
+			if (this.maxIndentation >= 20) {
+				this.indentationLevel++;
+			}
 			this.drawGraph();
 		}
 	},
@@ -133,18 +137,7 @@ export default {
       e.dataTransfer.setData("type", e.target.innerText);
 		},
 		onDrop(e) {
-			const typeLong = e.dataTransfer.getData("type");
-			
-			let type;
-			switch(typeLong) {
-				case "Phase": type = "PH"; break;
-				case "Section": type = "SE"; break;
-				case "Task": type = "AC"; break;
-				case "Milestone": type = "ML"; break;
-			}
-			this.currentComponent = { type, typeLong };
-			const index = this.components.push({ type, typeLong });
-			console.log(index);
+			this.components.push({type: e.dataTransfer.getData("type")});
 		},
 		drawGraph() {
 
@@ -342,32 +335,70 @@ export default {
 
 .components .graph-container {
 	height: 100%;
+	width: 70rem;
+	position: relative;
+}
+
+.components .actual-progress {
+	height: 115%;
+	width: 5rem;
+	position: relative;
+	top: 2.5%;
+	border-right: 2px solid #e2e2e2;
+}
+
+.components .actual-progress .progress {
+	background-color: #f2f2f2 !important;
+	color: green;
+	font-weight: bold;
+	font-size: 1.1rem;
+	margin: 20px 0;
+}
+
+.components .actual-progress div {
+	padding-bottom: 10px;
+	background-color: #42b983;
+	color: white;
+	width: 100%;
+}
+
+.graph-container .bars {
+	width: 95%;
+	position: absolute;
+	top: 60px;
+}
+
+.bars {
+	width: 100%;
+	height: 100%;
+	position: absolute;
+	left: 82px;
+	bottom: 40px;
+	border-top: 2px solid #e2e2e2;
+}
+
+.bars .bar {
+	height: 110%;
+	width: 1px;
+	position: absolute;
+	background-color: #e2e2e2;
+	top: -30px;
+	font-size: 0.9rem;
+}
+
+.graph {
+	height: 100%;
 	width: 100%;
 	position: relative;
 }
 
-.bar {
-	width: 100px;
-	height: 30px;
-	margin: 10px 0; 
+.graph-bar {
+	height: 10px;
+	width: 50px;
 	background-color: grey;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 5px;
-	color: white;
-	position: relative;
-}
-
-.progress-estimate {
-	width: 10%;
-	height: 100%;
 	position: absolute;
-	left: 0;
-	background-color: red;
-	padding-left: 10px;
+	top: -100px;
 }
-
 /************************Edit Panel**********************/
 
 .edit-panel {

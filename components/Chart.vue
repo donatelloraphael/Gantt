@@ -1,22 +1,31 @@
 <template>
 	<div class="chart-container">
+
+		<!-- Menu -->
 		<div class="menu">
-			<div class="roadmap">
-				<button class="roadmap" @click="createRoadmapDialog = true">New Roadmap</button>
-				<select class="roadmap" name="roadmap-select" id="roadmap-select">
-					<option value="">Select a roadmap</option>
-					<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
-				</select>
-			</div>
-			
+			<button class="roadmap" @click="createRoadmapDialog = true">New Roadmap</button>
+			<select class="roadmap" name="roadmap-select" id="roadmap-select">
+				<option value="">Select a roadmap</option>
+				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
+			</select>
+			<button class="roadmap positive">Save Roadmap</button>
+			<button class="roadmap negative">Delete Roadmap</button>
+			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Toggle Editor</button>
 		</div>
+
+		<!-- Operations -->
 		<div class="operations">
+			<div class="phase operation"><img :src="require('@/assets/icons/phase.svg')" alt="phase icon">Phase</div>
+			<div class="section operation"><img :src="require('@/assets/icons/section.svg')" alt="section icon">Section</div>
+			<div class="task operation"><img :src="require('@/assets/icons/task.svg')" alt="task icon">Task</div>
+			<div class="milestone operation"><img :src="require('@/assets/icons/milestone.svg')" alt="milestone icon">Milestone</div>
+		</div>
+
+		<!-- Components -->
+		<div class="components" :class="{ active: !editorShown }">
 			
 		</div>
-		<div class="components">
-			
-		</div>
-		<div class="edit-panel">
+		<div class="edit-panel" v-if="editorShown">
 			
 		</div>
 
@@ -54,6 +63,7 @@ export default {
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
+			editorShown: false,
 		}
 	},
 	methods: {
@@ -73,7 +83,7 @@ export default {
 					components: []
 				};
 				this.roadmaps.push(newRoadmap);
-				
+
 				// Clears state
 				this.createRoadmapDialog = false;
 				this.roadmapTitle = "";
@@ -116,7 +126,13 @@ export default {
 	background-color: #f2f2f2;
 	height: 100%;
 	display: flex;
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+	grid-template-rows: 1fr 1fr;
 	padding: 10px;
+	grid-column-gap: 40px;
+	grid-row-gap: 20px;
+	grid-auto-flow: row;
 }
 
 .roadmap {
@@ -126,30 +142,49 @@ export default {
 }
 
 .menu button.roadmap {
-	width: 200px;
 	height: 40px;
 	outline: none;
 	border: none;
-	background-color: #42b983;
+	background-color: #944e6c;
 	font-size: 1rem;
 	cursor: pointer;
 	display: inline-block;
 	text-align: center;
 	vertical-align: middle;
 	color: #fff;
+	grid-column: span 1;
 }
 
 .menu button.roadmap:hover {
-	background-color: #349969;
+	background-color: #7c425a;
 }
 
-.roadmap select {
+.menu select {
+	height: 40px;
 	font-size: 1rem;
 	border: none;
 	background-color: #cc7351;
 	color: white;
 	outline: none;
 	padding-left: 10px;
+}
+
+.menu .toggle {
+	background-color: white;
+	border: 2px #7c425a solid;
+	color: #7c425a;
+	font-size: 1rem;
+	grid-column: span 1;
+	width: 200px;
+}
+
+.menu .toggle:hover {
+	background-color: #eddce3;
+}
+
+.menu .toggle.active {
+	background-color: black;
+	color: white;
 }
 
 
@@ -160,12 +195,57 @@ export default {
 	background-color: #f2f2f2;
 }
 
+.operations div {
+	width: 180px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin: 30px 20px;
+	padding: 0 20px;
+	border-radius: 10px;
+	background-color: white;
+	margin-right: 20px;
+}
+
+.operations div img {
+	width: 25px;
+	height: 25px;
+	margin-right: 20px;
+}
+
+.operations .phase {
+	margin-top: 50px;
+	border: 2px solid #153e90;
+	color: #153e90;
+}
+
+.operations .section {
+	border: 2px solid #9f5f80;
+	color: #9f5f80;
+}
+
+.operations .task {
+	border: 2px solid #045762;
+	color: #045762;
+}
+
+.operations .milestone {
+	border: 2px solid #682c0e;
+	color: #682c0e;
+}
+
 /************************Components**********************/
 
 .components {
 	height: 100%;
 	grid-column: span 3;
 	background-color: #f2f2f2;
+	overflow: auto;
+}
+
+.components.active {
+	grid-column: span 4 !important;
 }
 
 /************************Edit Panel**********************/
@@ -173,8 +253,7 @@ export default {
 .edit-panel {
 	height: 100%;
 	background-color: #f2f2f2;
-	grid-column: span 1;
-	/*display: none;*/
+	grid-column: span 2;
 }
 
 /*************************Dialogs************************/
@@ -231,19 +310,19 @@ button {
 }
 
 button.positive {
-	background-color: #42b983;
+	background-color: #42b983 !important;
 }
 
 button.positive:hover {
-	background-color: #39966a;
+	background-color: #39966a !important;
 }
 
 button.negative {
-	background-color: #dd3b00;
+	background-color: #dd3b00 !important;
 }
 
 button.negative:hover {
-	background-color: #ad2e00;
+	background-color: #ad2e00 !important;
 }
 
 /***********************Media Queries********************/
@@ -255,7 +334,7 @@ button.negative:hover {
 }
 @media(max-width: 1150px) {
 	.chart-container {
-  	grid-template-rows: 100px 300px 600px;
+  	grid-template-rows: 100px 400px 600px;
 	}
 	.menu {
 		grid-column: span 4;
@@ -263,18 +342,29 @@ button.negative:hover {
 	.operations {
 		grid-column: span 1;
 	}
+	.components {
+ 		grid-column: span 4;
+	}
 	.edit-panel {
 		grid-column: span 3;
 	}
-	.components {
-		grid-column: span 4;
+}
+
+@media(max-width: 814px) {
+	.chart-container {
+  	grid-template-columns: repeat(auto-fit, 1fr);
+  	grid-template-rows: 200px 400px 600px 600px;
+	}
+	.menu {
+		grid-template-rows: 1fr 1fr 1fr;
+		height: auto;
 	}
 }
 
 @media(max-width: 610px) {
 	.chart-container {
   	grid-template-columns: repeat(auto-fit, 1fr);
-  	grid-template-rows: 100px 400px 600px 600px;
+  	grid-template-rows: 200px 400px 600px 600px;
 	}
 	.operations {
 		grid-column: span 1;

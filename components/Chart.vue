@@ -4,7 +4,7 @@
 		<!-- Menu -->
 		<div class="menu">
 			<button class="roadmap" @click="createRoadmapDialog = true">New Roadmap</button>
-			<select class="roadmap" name="roadmap-select" id="roadmap-select">
+			<select class="roadmap" name="roadmap-select" id="roadmap-select" @change="getRoadmap($event.target.value)">
 				<option value="">Select a roadmap</option>
 				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
@@ -85,7 +85,7 @@ export default {
 	data() {
 		return {
 			roadmaps: [],
-			selectedRoadmap: null,
+			roadmap: [],
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
@@ -101,7 +101,8 @@ export default {
 		components() {
 			// console.log(this.components);
 			this.drawGraph();
-		}
+		},
+	
 	},
 	methods: {
 		async createRoadmap() {
@@ -144,11 +145,51 @@ export default {
 			}
 			this.currentComponent = { type, typeLong };
 			const index = this.components.push({ type, typeLong });
-			console.log(index);
 		},
 		drawGraph() {
 
 		},
+		getRoadmap(guid) {
+			this.$axios.$get(`/api/roadmaps/${guid}`)
+			.then((result) => {
+				this.transformComponents(result.components);
+			}).catch(err => console.log(err));
+		},
+		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
+		transformComponents(components) {
+
+			const transformedComponents = [];
+			const rootComponents = components.filter((item) => {
+				return !item.parentGuid || item.parentGuid === "00000000-0000-0000-0000-000000000000";
+			});
+
+			// Deals with top-level components
+			for (let i = 0; i < rootComponents.length; i++) {
+				transformedComponents.push(rootComponents[i]);
+				populateDependencies(rootComponents[i], i);
+			}
+
+			// Recursive function to replace guid of dependencies of components with whole objects
+			function populateDependencies(component, position) {
+				for (let i = 0; i < component.dependencies.length; i++) {
+					for (let j = 0; j < components.length; j++) {
+						if (components[j].guid === component.dependencies[i].guid) {
+							populateDependencies(components[j], j)
+						}
+					}
+					// Gets the object that matches the guid
+					for (let k = 0; k < components.length; k++) {
+						if (components[k].guid === component.dependencies[i]) {
+							transformedComponents[position].dependencies[i] = components[k];
+							for (let m = 0; m < components[k].dependencies.length; m++) {
+								populateDependencies(components[k], m);
+							}
+						}
+					}
+				}
+			}
+			console.log(transformedComponents);
+		}
 
 	},
 	async fetch() {
@@ -156,8 +197,6 @@ export default {
 		this.roadmaps = await this.$axios.$get("/api/roadmaps")
 		.catch(err => console.log(err));
 	},
-	mounted() {
-	}
 };
 </script>
 

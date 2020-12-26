@@ -9,7 +9,7 @@
 				<option value="">Select a roadmap</option>
 				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
-			<button class="roadmap positive">Save Roadmap</button>
+			<!-- <button class="roadmap positive">Save Roadmap</button> -->
 			<button class="roadmap negative">Delete Roadmap</button>
 			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Toggle Editor</button>
 		</div>
@@ -29,7 +29,7 @@
 
 		<!-- Components -->
 
-		<div class="components" :class="{ active: !editorShown }" @drop="onDrop($event)" @dragover.prevent @dragenter.prevent>
+		<div class="components"  v-if="!componentsPanelDisabled" :class="{ active: !editorShown }" @drop="onDrop($event)" @dragover.prevent @dragenter.prevent>
 			<div class="heading">
 				<div class="title">
 					<h2>Roadmap name</h2>
@@ -47,7 +47,7 @@
 				</div> -->
 
 				<ul class="blocks">
-				  <Block :block="components"></Block>
+				  <Block v-if="components.dependencies":block="components"></Block>
 				</ul>
 			</div>
 			
@@ -90,16 +90,14 @@ export default {
 	data() {
 		return {
 			roadmaps: [],
-			roadmap: [],
+			roadmap: {},
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
 			editorShown: false,
 			components: {},
-			indentationLevel: 1,
-			currentComponent: {
-
-			},
+			currentComponent: {},
+			componentsPanelDisabled: true,
 		};
 	},
 	components: {
@@ -109,8 +107,7 @@ export default {
 		components() {
 			console.log(this.components);
 			// this.drawGraph();
-		},
-	
+		},	
 	},
 	methods: {
 		async createRoadmap() {
@@ -151,32 +148,76 @@ export default {
 				case "Task": type = "AC"; break;
 				case "Milestone": type = "ML"; break;
 			}
-			this.currentComponent = { type, typeLong };
-			const index = this.components.push({ type, typeLong });
+
+			if (!this.components.dependencies) {
+				this.components.dependencies = [];
+			}
+
+			const components = this.components.dependencies;
+			// let order = 0;
+			// console.log(components)
+			// for (let i = components.length - 1; i >= 0; i--) {
+			// 	if (!components[i].parentGuid || components[i].parentGuid === "00000000-0000-0000-0000-000000000000") {
+			// 		order = components[i].order + 1;
+			// 		break;
+			// 	}
+			// }
+
+			this.currentComponent = { 
+				type, 
+				typeLong,
+				dependencies: [],
+				estimatedDuration: 0,
+				code: "New " + typeLong,
+				description: "",
+				order: components.length,
+				absoluteIndex: components.length,
+				status: "created",
+				progress: 0,
+				roadmapGuid: this.roadmap.guid,
+				parentGuid: "00000000-0000-0000-0000-000000000000",
+				startDateTime: "",
+				leaf: true,
+				expanded: false,
+			};
+			
+			const index = this.components.dependencies.push(this.currentComponent);
+			console.log(this.components.dependencies);
 		},
 		drawGraph() {
 
 		},
 		getRoadmap(guid) {
 			if (!guid) {
+				this.roadmap.title = "";
+				this.roadmap.description = "";
+				this.roadmap.guid = "";
 				this.components = [];
+				this.componentsPanelDisabled = true;
+				return;
+			} else {
+				this.componentsPanelDisabled = false;
 			}
+
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
+				this.roadmap.title = result.title;
+				this.roadmap.description = result.description;
+				this.roadmap.guid = result.guid;
+
 				this.transformComponents(result.components);
 			}).catch(err => console.log(err));
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
 
-			const transformedComponents = { leaf: false, expanded: true };
+			const transformedComponents = { expanded: true };
 			transformedComponents.dependencies = components.filter((item) => {
 				return !item.parentGuid || item.parentGuid === "00000000-0000-0000-0000-000000000000";
 			});
 
 			// Deals with top-level components
 			for (let i = 0; i < transformedComponents.dependencies.length; i++) {
-				transformedComponents.dependencies[i].leaf = false;
 				transformedComponents.dependencies[i].expanded = true;
 				populateDependencies(transformedComponents.dependencies[i]);
 			}
@@ -185,21 +226,21 @@ export default {
 			function populateDependencies(component) {
 				for (let i = 0; i < component.dependencies.length; i++) {
 					for (let j = 0; j < components.length; j++) {
+						// Match object in components and replace the guid with it
 						if (components[j].guid === component.dependencies[i]) {
 							component.dependencies[i] = components[j];
 							if (component.dependencies[i].dependencies.length > 0) {
-								component.dependencies[i].leaf = false;
 								component.dependencies[i].expanded = true;
-								populateDependencies(component.dependencies[i])
-							} else {
-								component.dependencies[i].leaf = true;
+								populateDependencies(component.dependencies[i]);
 							}
 						}
 					}
 				}
+				// Sort dependencies by the order value
+				component.dependencies = component.dependencies.sort((a, b) => a.order - b.order);
 			}
 			this.components = transformedComponents;
-		}
+		},
 
 	},
 	async fetch() {
@@ -392,21 +433,11 @@ export default {
 	height: 100%;
 	width: 100%;
 	position: relative;
-}
-
-.bar {
-	width: 100px;
-	height: 30px;
-	margin: 10px 0; 
-	background-color: grey;
 	display: flex;
-	align-items: center;
-	justify-content: center;
-	border-radius: 5px;
-	color: white;
-	position: relative;
+	justify-content: space-between;
 }
 
+/***********Component Blocks************/
 .bar span {
 	z-index: 150;
 }
@@ -421,14 +452,16 @@ export default {
 }
 
 ul.blocks {
-  padding: 1rem;
-  margin: 0;
-  box-sizing: border-box;
-  width: 100%;
-  list-style: none
+	list-style: none;
+	text-align: left;
+	margin: 0px;
+	padding: 0px;
+	border: none !important;
 }
+
 ul.blocks > li:first-child {
-  padding: 1rem 1rem 1rem 0
+  padding: 1rem 1rem 1rem 0;
+  border: none;
 }
 
 

@@ -2,6 +2,7 @@
 	<div class="chart-container">
 
 		<!-- Menu -->
+
 		<div class="menu">
 			<button class="roadmap" @click="createRoadmapDialog = true">New Roadmap</button>
 			<select class="roadmap" name="roadmap-select" id="roadmap-select" @change="getRoadmap($event.target.value)">
@@ -14,6 +15,7 @@
 		</div>
 
 		<!-- Operations -->
+
 		<div class="operations">
 			<div class="phase operation" draggable
         @dragstart="startDrag($event)"><img :src="require('@/assets/icons/phase.svg')" alt="phase icon">Phase</div>
@@ -26,6 +28,7 @@
 		</div>
 
 		<!-- Components -->
+
 		<div class="components" :class="{ active: !editorShown }" @drop="onDrop($event)" @dragover.prevent @dragenter.prevent>
 			<div class="heading">
 				<div class="title">
@@ -38,13 +41,14 @@
 			</div>
 
 			<div class="graph-container">
-				<div class="bar" v-for="item in components">
-					<div class="progress-estimate">
-						
-					</div>
+				<!-- <div class="bar" v-for="item in components">
+					<div class="progress-estimate"></div>
 					<span>{{ item.type }}</span>
+				</div> -->
 
-				</div>
+				<ul class="blocks">
+				  <Block :block="components"></Block>
+				</ul>
 			</div>
 			
 			
@@ -79,6 +83,7 @@
 
 
 <script>
+import Block from "./Block";
 	
 export default {
 	name: "Chart",
@@ -90,17 +95,20 @@ export default {
 			roadmapTitle: "",
 			roadmapDescription: "",
 			editorShown: false,
-			components: [],
+			components: {},
 			indentationLevel: 1,
 			currentComponent: {
 
 			},
-		}
+		};
+	},
+	components: {
+		Block,
 	},
 	watch: {
 		components() {
-			// console.log(this.components);
-			this.drawGraph();
+			console.log(this.components);
+			// this.drawGraph();
 		},
 	
 	},
@@ -150,6 +158,9 @@ export default {
 
 		},
 		getRoadmap(guid) {
+			if (!guid) {
+				this.components = [];
+			}
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
 				this.transformComponents(result.components);
@@ -158,13 +169,16 @@ export default {
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
 
-			const transformedComponents = components.filter((item) => {
+			const transformedComponents = { leaf: false, expanded: true };
+			transformedComponents.dependencies = components.filter((item) => {
 				return !item.parentGuid || item.parentGuid === "00000000-0000-0000-0000-000000000000";
 			});
 
 			// Deals with top-level components
-			for (let i = 0; i < transformedComponents.length; i++) {
-				populateDependencies(transformedComponents[i]);
+			for (let i = 0; i < transformedComponents.dependencies.length; i++) {
+				transformedComponents.dependencies[i].leaf = false;
+				transformedComponents.dependencies[i].expanded = true;
+				populateDependencies(transformedComponents.dependencies[i]);
 			}
 
 			// Recursive function to replace guid of dependencies of components array with whole objects
@@ -174,13 +188,17 @@ export default {
 						if (components[j].guid === component.dependencies[i]) {
 							component.dependencies[i] = components[j];
 							if (component.dependencies[i].dependencies.length > 0) {
+								component.dependencies[i].leaf = false;
+								component.dependencies[i].expanded = true;
 								populateDependencies(component.dependencies[i])
+							} else {
+								component.dependencies[i].leaf = true;
 							}
 						}
 					}
 				}
 			}
-			console.log(transformedComponents);
+			this.components = transformedComponents;
 		}
 
 	},
@@ -285,7 +303,6 @@ export default {
 	color: white;
 }
 
-
 /*************************Operations*********************/
 
 .operations {
@@ -348,7 +365,7 @@ export default {
 
 .components .heading {
 	width: 70rem;
-	background-color: #b541a9;
+	background-color: #2e3192;
 	text-align: left;
 	padding: 10px 0 10px 15px;
 	color: white;
@@ -390,14 +407,30 @@ export default {
 	position: relative;
 }
 
+.bar span {
+	z-index: 150;
+}
+
 .progress-estimate {
-	width: 10%;
+	width: 70%;
 	height: 100%;
 	position: absolute;
 	left: 0;
-	background-color: red;
+	background-color: rgba(255, 0, 0, 0.5);
 	padding-left: 10px;
 }
+
+ul.blocks {
+  padding: 1rem;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100%;
+  list-style: none
+}
+ul.blocks > li:first-child {
+  padding: 1rem 1rem 1rem 0
+}
+
 
 /************************Edit Panel**********************/
 

@@ -167,14 +167,14 @@ export default {
 				populateDependencies(transformedComponents[i]);
 			}
 
-			// Recursive function to replace guid of dependencies of components with whole objects
+			// Recursive function to replace guid of dependencies of components array with whole objects
 			function populateDependencies(component) {
 				for (let i = 0; i < component.dependencies.length; i++) {
 					for (let j = 0; j < components.length; j++) {
 						if (components[j].guid === component.dependencies[i]) {
 							component.dependencies[i] = components[j];
 							if (component.dependencies[i].dependencies.length > 0) {
-								populateDependencies(components[j])
+								populateDependencies(component.dependencies[i])
 							}
 						}
 					}

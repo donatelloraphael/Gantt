@@ -158,31 +158,23 @@ export default {
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
 
-			const transformedComponents = [];
-			const rootComponents = components.filter((item) => {
+			const transformedComponents = components.filter((item) => {
 				return !item.parentGuid || item.parentGuid === "00000000-0000-0000-0000-000000000000";
 			});
 
 			// Deals with top-level components
-			for (let i = 0; i < rootComponents.length; i++) {
-				transformedComponents.push(rootComponents[i]);
-				populateDependencies(rootComponents[i], i);
+			for (let i = 0; i < transformedComponents.length; i++) {
+				populateDependencies(transformedComponents[i]);
 			}
 
 			// Recursive function to replace guid of dependencies of components with whole objects
-			function populateDependencies(component, position) {
+			function populateDependencies(component) {
 				for (let i = 0; i < component.dependencies.length; i++) {
 					for (let j = 0; j < components.length; j++) {
-						if (components[j].guid === component.dependencies[i].guid) {
-							populateDependencies(components[j], j)
-						}
-					}
-					// Gets the object that matches the guid
-					for (let k = 0; k < components.length; k++) {
-						if (components[k].guid === component.dependencies[i]) {
-							transformedComponents[position].dependencies[i] = components[k];
-							for (let m = 0; m < components[k].dependencies.length; m++) {
-								populateDependencies(components[k], m);
+						if (components[j].guid === component.dependencies[i]) {
+							component.dependencies[i] = components[j];
+							if (component.dependencies[i].dependencies.length > 0) {
+								populateDependencies(components[j])
 							}
 						}
 					}

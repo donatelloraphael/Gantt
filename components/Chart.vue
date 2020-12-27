@@ -32,8 +32,8 @@
 		<div class="components"  v-if="!componentsPanelDisabled" :class="{ active: !editorShown }" @drop="onDrop($event)" @dragover.prevent @dragenter.prevent>
 			<div class="heading">
 				<div class="title">
-					<h2>Roadmap name</h2>
-					<h3>Roadmap description</h3>
+					<h2>{{ roadmap.title }}</h2>
+					<h3>{{ roadmap.description }}</h3>
 				</div>
 				<div class="duration">
 					<h2>15m / 30m</h2>
@@ -47,7 +47,7 @@
 				</div> -->
 
 				<ul class="blocks">
-				  <Block v-if="components.dependencies":block="components"></Block>
+				  <Block :block="components"></Block>
 				</ul>
 			</div>
 			
@@ -90,12 +90,12 @@ export default {
 	data() {
 		return {
 			roadmaps: [],
-			roadmap: {},
+			roadmap: { title: "Roadmap", description: "Roadmap details"},
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
 			editorShown: false,
-			components: {},
+			components: { expanded: true, children: [] },
 			currentComponent: {},
 			componentsPanelDisabled: true,
 		};
@@ -149,11 +149,11 @@ export default {
 				case "Milestone": type = "ML"; break;
 			}
 
-			if (!this.components.dependencies) {
-				this.components.dependencies = [];
+			if (!this.components.children) {
+				this.components.children = [];
 			}
 
-			const components = this.components.dependencies;
+			const components = this.components.children;
 			// let order = 0;
 			// console.log(components)
 			// for (let i = components.length - 1; i >= 0; i--) {
@@ -167,6 +167,7 @@ export default {
 				type, 
 				typeLong,
 				dependencies: [],
+				children: [],
 				estimatedDuration: 0,
 				code: "New " + typeLong,
 				description: "",
@@ -177,12 +178,11 @@ export default {
 				roadmapGuid: this.roadmap.guid,
 				parentGuid: "00000000-0000-0000-0000-000000000000",
 				startDateTime: "",
-				leaf: true,
 				expanded: false,
 			};
 			
-			const index = this.components.dependencies.push(this.currentComponent);
-			console.log(this.components.dependencies);
+			const index = this.components.children.push(this.currentComponent);
+			console.log(this.components.children);
 		},
 		drawGraph() {
 
@@ -192,7 +192,7 @@ export default {
 				this.roadmap.title = "";
 				this.roadmap.description = "";
 				this.roadmap.guid = "";
-				this.components = [];
+				this.components = { expanded: true, children: [] };
 				this.componentsPanelDisabled = true;
 				return;
 			} else {
@@ -205,41 +205,67 @@ export default {
 				this.roadmap.description = result.description;
 				this.roadmap.guid = result.guid;
 
-				this.transformComponents(result.components);
+				this.components = this.transformComponents(result.components);
 			}).catch(err => console.log(err));
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
 
+			// Add the children array containing guids to components
+			(function addChildren () {
+
+				// populate the children array of each component with guid of its children
+				for (let i = 0, m = components.length; i < m; i++) {
+					if (!components[i].children) {
+						components[i].children = [];
+					}
+					for (let j = 0; j < m; j++) {
+						if (components[i].parentGuid === components[j].guid) {
+							components[j].children.push(components[i].guid);
+						}
+					}
+				}
+			})();
+
 			const transformedComponents = { expanded: true };
-			transformedComponents.dependencies = components.filter((item) => {
+
+			// Filters out the non-root components
+			transformedComponents.children = components.filter((item) => {
 				return !item.parentGuid || item.parentGuid === "00000000-0000-0000-0000-000000000000";
 			});
 
-			// Deals with top-level components
-			for (let i = 0; i < transformedComponents.dependencies.length; i++) {
-				transformedComponents.dependencies[i].expanded = true;
-				populateDependencies(transformedComponents.dependencies[i]);
+			// Sorts the top level components by position value
+			transformedComponents.children = sortByPosition(transformedComponents.children);
+
+			// Iterates and calls populateChildren function on top-level components
+			for (let i = 0; i < transformedComponents.children.length; i++) {
+				transformedComponents.children[i].expanded = true;
+				populateChildren(transformedComponents.children[i]);
 			}
 
-			// Recursive function to replace guid of dependencies of components array with whole objects
-			function populateDependencies(component) {
-				for (let i = 0; i < component.dependencies.length; i++) {
-					for (let j = 0; j < components.length; j++) {
+			// Recursive function to replace guid of children of components array with whole objects
+			function populateChildren(component) {
+				for (let i = 0, m = component.children.length; i < m; i++) {
+					for (let j = 0, n = components.length; j < n; j++) {
 						// Match object in components and replace the guid with it
-						if (components[j].guid === component.dependencies[i]) {
-							component.dependencies[i] = components[j];
-							if (component.dependencies[i].dependencies.length > 0) {
-								component.dependencies[i].expanded = true;
-								populateDependencies(component.dependencies[i]);
+						if (components[j].guid === component.children[i]) {
+							component.children[i] = components[j];
+							if (component.children[i].children.length > 0) {
+								component.children[i].expanded = true;
+								populateChildren(component.children[i]);
 							}
 						}
 					}
 				}
-				// Sort dependencies by the order value
-				component.dependencies = component.dependencies.sort((a, b) => a.order - b.order);
+				component.children = sortByPosition(component.children);
 			}
-			this.components = transformedComponents;
+
+			// Sort elements by position value
+			function sortByPosition(array) {
+				return array.sort((a, b) => a.position - b.position);
+			}
+
+			return transformedComponents;
 		},
 
 	},
@@ -460,10 +486,9 @@ ul.blocks {
 }
 
 ul.blocks > li:first-child {
-  padding: 1rem 1rem 1rem 0;
+  padding: 0.3rem 0 0 0;
   border: none;
 }
-
 
 /************************Edit Panel**********************/
 

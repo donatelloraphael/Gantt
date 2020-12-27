@@ -1,12 +1,13 @@
 <template>
   <li class="block">
-  	<input type="checkbox" :value="block" v-if="block.code">
-  	<span class="sign" v-if="block.dependencies.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
-  	<span v-if="!block.dependencies.length && block.code" class="placeholder"></span>
-    <span class="block" @click="expand(); toggleSign();" v-if="block.guid">{{ block.code }}</span>
+  	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code">
+  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
+  	<span v-if="!block.children.length && block.code" class="placeholder"></span>
+    <span class="block" @click="expand(); toggleSign();" v-if="block.guid">{{ blockName }}</span>
+    <div class="drop-zone" @click="log()"></div>
 
-    <ul class="sub-blocks" v-if="block.dependencies && block.dependencies.length > 0" v-show="block.expanded">
-      <block v-for="dependency in block.dependencies" v-bind:block="dependency":key="dependency.guid"></block>
+    <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
+      <block v-for="child in block.children" v-bind:block="child":key="child.guid"></block>
     </ul>
   </li>
 </template>
@@ -21,6 +22,11 @@
 	  		sign: "–",
 	  	}
 	  },
+	  computed: {
+	  	blockName() {
+				return this.block.code.length > 17 ? this.block.code.substr(0, 17) + "..." : this.block.code;
+			},
+	  },
 	  methods: {
 	    expand() {
 	      this.block.expanded = !this.block.expanded;
@@ -32,10 +38,10 @@
 	    		this.sign = "+";
 	    	}
 	    },
+	    log() {
+	    	console.log(this.block);
+	    }
 	  },
-	  mounted() {
-	  	console.log(this.block)
-	  }
 	};
 
 </script>
@@ -44,7 +50,7 @@
 	
 	li {
 	  padding: 0 0 0 1rem;
-  	/*border-left: 1px solid #d3d3d3;*/
+	  /*border-left: 1px solid #d3d3d3;*/
 	}
 
 	li > span.block {
@@ -54,6 +60,7 @@
 	  display:inline-block;
 	  position: relative;
 	  bottom: 4px;
+	  width: 150px;
 	}
 
 	ul.sub-blocks {
@@ -82,6 +89,14 @@
 	li input {
 		position: absolute;
 		left: 0;
+	}
+
+	.drop-zone {
+		width: 70vw;
+		height: 15px;
+		background-color: yellow;
+		position: relative;
+		bottom: 4px;
 	}
 
 </style>

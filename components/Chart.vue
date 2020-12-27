@@ -23,13 +23,12 @@
         @dragstart="startDrag($event)"><img :src="require('@/assets/icons/section.svg')" alt="section icon">Section</div>
 			<div class="task operation" draggable
         @dragstart="startDrag($event)"><img :src="require('@/assets/icons/task.svg')" alt="task icon">Task</div>
-			<div class="milestone operation" draggable
-        @dragstart="startDrag($event)"><img :src="require('@/assets/icons/milestone.svg')" alt="milestone icon">Milestone</div>
+			<div class="milestone operation"><img :src="require('@/assets/icons/milestone.svg')" alt="milestone icon">Milestone</div>
 		</div>
 
 		<!-- Components -->
 
-		<div class="components"  v-if="!componentsPanelDisabled" :class="{ active: !editorShown }" @drop="onDrop($event)" @dragover.prevent @dragenter.prevent>
+		<div class="components" :class="{ active: !editorShown }">
 			<div class="heading">
 				<div class="title">
 					<h2>{{ roadmap.title }}</h2>
@@ -40,7 +39,7 @@
 				</div>
 			</div>
 
-			<div class="graph-container">
+			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 				<!-- <div class="bar" v-for="item in components">
 					<div class="progress-estimate"></div>
 					<span>{{ item.type }}</span>
@@ -103,12 +102,11 @@ export default {
 	components: {
 		Block,
 	},
-	watch: {
-		components() {
-			console.log(this.components);
-			// this.drawGraph();
-		},	
-	},
+	// watch: {
+	// 	components() {
+	// 		console.log(this.components);
+	// 	},	
+	// },
 	methods: {
 		async createRoadmap() {
 			const title = this.roadmapTitle;
@@ -133,60 +131,7 @@ export default {
 				this.roadmapDescription = "";
 			}).catch(err => console.log(err));
 		},
-		startDrag(e) {
-			e.dataTransfer.dropEffect = "copy";
-      e.dataTransfer.effectAllowed = "copy";
-      e.dataTransfer.setData("type", e.target.innerText);
-		},
-		onDrop(e) {
-			const typeLong = e.dataTransfer.getData("type");
-			
-			let type;
-			switch(typeLong) {
-				case "Phase": type = "PH"; break;
-				case "Section": type = "SE"; break;
-				case "Task": type = "AC"; break;
-				case "Milestone": type = "ML"; break;
-			}
 
-			if (!this.components.children) {
-				this.components.children = [];
-			}
-
-			const components = this.components.children;
-			// let order = 0;
-			// console.log(components)
-			// for (let i = components.length - 1; i >= 0; i--) {
-			// 	if (!components[i].parentGuid || components[i].parentGuid === "00000000-0000-0000-0000-000000000000") {
-			// 		order = components[i].order + 1;
-			// 		break;
-			// 	}
-			// }
-
-			this.currentComponent = { 
-				type, 
-				typeLong,
-				dependencies: [],
-				children: [],
-				estimatedDuration: 0,
-				code: "New " + typeLong,
-				description: "",
-				order: components.length,
-				absoluteIndex: components.length,
-				status: "created",
-				progress: 0,
-				roadmapGuid: this.roadmap.guid,
-				parentGuid: "00000000-0000-0000-0000-000000000000",
-				startDateTime: "",
-				expanded: false,
-			};
-			
-			const index = this.components.children.push(this.currentComponent);
-			console.log(this.components.children);
-		},
-		drawGraph() {
-
-		},
 		getRoadmap(guid) {
 			if (!guid) {
 				this.roadmap.title = "";
@@ -267,6 +212,50 @@ export default {
 
 			return transformedComponents;
 		},
+
+		startDrag(e) {
+			e.dataTransfer.dropEffect = "copy";
+      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData("type", e.target.innerText);
+		},
+		async onDropEmpty(e) {
+			const typeLong = e.dataTransfer.getData("type");
+			
+			if (!typeLong) return;
+
+			let type;
+			switch(typeLong) {
+				case "Phase": type = "PH"; break;
+				case "Section": type = "SE"; break;
+				case "Task": type = "AC"; break;
+				case "Milestone": type = "ML"; break;
+			}
+
+			if (!this.components.children) {
+				this.components.children = [];
+			}
+
+			const components = this.components.children;
+
+			this.currentComponent = { 
+				type, 
+				typeLong,
+				children: [],
+				code: "New " + typeLong,
+				description: "",
+				position: components[components.length -1] ? components[components.length -1].position + 1 : 0,
+				roadmapGuid: this.roadmap.guid,
+				parentGuid: "00000000-0000-0000-0000-000000000000",
+				expanded: true,
+				guid: components.length, // Temporary to prevent vue key warning
+			};
+			const index = this.components.children.push(this.currentComponent) - 1;
+
+			// const updatedComponent = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
+			// .catch(err => console.log(err));
+			// this.components.children[index] = updatedComponent;
+		},
+			
 
 	},
 	async fetch() {

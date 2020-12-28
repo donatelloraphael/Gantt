@@ -91,6 +91,7 @@ export default {
 		return {
 			roadmaps: [],
 			roadmap: { title: "Roadmap", description: "Roadmap details", components: []},
+			roadmapChanged: false,
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
@@ -104,10 +105,10 @@ export default {
 		Block,
 	},
 	watch: {
-		roadmap() {
+		roadmapChanged() {
 			this.components = this.transformComponents(this.roadmap.components);
 			console.log("this.components");
-		},	
+		},
 	},
 	methods: {
 		async createRoadmap() {
@@ -150,6 +151,7 @@ export default {
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
 				this.roadmap = result;
+				this.roadmapChanged = !this.roadmapChanged;
 			}).catch(err => console.log(err));
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
@@ -263,30 +265,43 @@ export default {
 					guid: components.length, // Temporary to prevent vue key warning
 				};
 				const index = this.roadmap.components.push(this.currentComponent) - 1;
+				this.roadmapChanged = !this.roadmapChanged;
 
 				// Saves created component to backend and updates local copy of the component
 				const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
 				.catch(err => console.log(err));
 
 				this.roadmap.components[index].guid = createdComponentGuid;
+				this.roadmapChanged = !this.roadmapChanged;
 
 			} else { // If it's not a new component
 
 				const component = JSON.parse(e.dataTransfer.getData("component"));
 
-				console.log(component)
-				const newPosition = components[components.length -1] ? components[components.length -1].position : 0;
-				console.log(newPosition)
+				const newPosition = components[components.length -1] ? components[components.length -1].position + 1 : 0;
 
 				for (let i = 0, length = components.length; i < length; i++) {
 					if (components[i].guid === component.guid) {
-						this.roadmap.components[i].position = newPosition;
-						this.roadmap.changed = !this.roadmap.changed;
+						components[i].position = newPosition;
+						this.roadmapChanged = !this.roadmapChanged;
+						this.saveMove([components[i].guid], newPosition, "00000000-0000-0000-0000-000000000000");
 						break;
 					}
 				}
 			}
 		},
+
+		saveMove(items, newPosition, newParentGuid ) {
+			const body = {
+				roadmapGuid: this.roadmap.guid,
+				items,
+				newParentGuid,
+				index: newPosition
+			};
+
+			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
+			.catch(err => console.log(err));
+		}
 
 
 	},

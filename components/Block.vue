@@ -3,7 +3,8 @@
   	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code">
   	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
   	<span v-if="!block.children.length && block.code" class="placeholder"></span>
-    <span class="block" @click="expand(); toggleSign();" v-if="block.guid">{{ blockName }}</span>
+    <span class="block" @click="expand(); toggleSign();" v-if="block.guid" draggable
+        @dragstart="startDrag($event)">{{ blockName }}</span>
     <div class="drop-zone" @click="log()"></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
@@ -40,6 +41,12 @@
 	    },
 	    log() {
 	    	console.log(this.block);
+	    },
+	    startDrag(e) {
+	    	e.dataTransfer.dropEffect = "move";
+      	e.dataTransfer.effectAllowed = "move";
+      	e.dataTransfer.setData("type", this.block.type);
+				e.dataTransfer.setData("component", JSON.stringify(this.block));
 	    }
 	  },
 	};

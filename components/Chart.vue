@@ -22,7 +22,8 @@
 			<div class="section operation" draggable
         @dragstart="startDrag($event)"><img :src="require('@/assets/icons/section.svg')" alt="section icon">Section</div>
 			<div class="task operation" draggable
-        @dragstart="startDrag($event)"><img :src="require('@/assets/icons/task.svg')" alt="task icon">Task</div>
+        @dragstart="startDrag($event)"><img :src="require('@/assets/icons/task.svg')" alt="task icon">Action</div>
+        <!-- TODO --> <!--Drag disabled on Milestone -->
 			<div class="milestone operation"><img :src="require('@/assets/icons/milestone.svg')" alt="milestone icon">Milestone</div>
 		</div>
 
@@ -89,7 +90,7 @@ export default {
 	data() {
 		return {
 			roadmaps: [],
-			roadmap: { title: "Roadmap", description: "Roadmap details"},
+			roadmap: { title: "Roadmap", description: "Roadmap details", components: []},
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
@@ -102,11 +103,12 @@ export default {
 	components: {
 		Block,
 	},
-	// watch: {
-	// 	components() {
-	// 		console.log(this.components);
-	// 	},	
-	// },
+	watch: {
+		roadmap() {
+			this.components = this.transformComponents(this.roadmap.components);
+			console.log("this.components");
+		},	
+	},
 	methods: {
 		async createRoadmap() {
 			const title = this.roadmapTitle;
@@ -133,9 +135,10 @@ export default {
 		},
 
 		getRoadmap(guid) {
+			// clears state
 			if (!guid) {
-				this.roadmap.title = "";
-				this.roadmap.description = "";
+				this.roadmap.title = "Roadmap Title";
+				this.roadmap.description = "Roadmap Description";
 				this.roadmap.guid = "";
 				this.components = { expanded: true, children: [] };
 				this.componentsPanelDisabled = true;
@@ -146,11 +149,7 @@ export default {
 
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
-				this.roadmap.title = result.title;
-				this.roadmap.description = result.description;
-				this.roadmap.guid = result.guid;
-
-				this.components = this.transformComponents(result.components);
+				this.roadmap = result;
 			}).catch(err => console.log(err));
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
@@ -213,49 +212,82 @@ export default {
 			return transformedComponents;
 		},
 
+		// On starting dragging items from operations panel
 		startDrag(e) {
 			e.dataTransfer.dropEffect = "copy";
       e.dataTransfer.effectAllowed = "copy";
-      e.dataTransfer.setData("type", e.target.innerText);
-		},
-		async onDropEmpty(e) {
-			const typeLong = e.dataTransfer.getData("type");
-			
-			if (!typeLong) return;
 
-			let type;
-			switch(typeLong) {
+      let type;
+			switch(e.target.innerText) {
 				case "Phase": type = "PH"; break;
 				case "Section": type = "SE"; break;
-				case "Task": type = "AC"; break;
+				case "Action": type = "AC"; break;
 				case "Milestone": type = "ML"; break;
 			}
+      e.dataTransfer.setData("type", type);
+      e.dataTransfer.setData("isnew", true);
+		},
+		// Dropping items in to a top level empty space
+		async onDropEmpty(e) {
+			const type = e.dataTransfer.getData("type");
+			const isNew = e.dataTransfer.getData("isNew");
 
-			if (!this.components.children) {
-				this.components.children = [];
+			if (!type) return;
+
+			let typeLong;
+			switch(type) {
+				case "PH": typeLong = "Phase"; break;
+				case "SE": typeLong = "Section"; break;
+				case "AC": typeLong = "Action"; break;
+				case "ML": typeLong = "Milestone"; break;
 			}
 
-			const components = this.components.children;
+			const components = this.roadmap.components;
 
-			this.currentComponent = { 
-				type, 
-				typeLong,
-				children: [],
-				code: "New " + typeLong,
-				description: "",
-				position: components[components.length -1] ? components[components.length -1].position + 1 : 0,
-				roadmapGuid: this.roadmap.guid,
-				parentGuid: "00000000-0000-0000-0000-000000000000",
-				expanded: true,
-				guid: components.length, // Temporary to prevent vue key warning
-			};
-			const index = this.components.children.push(this.currentComponent) - 1;
+			// If it's a new component
+			if (isNew) {
 
-			// const updatedComponent = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
-			// .catch(err => console.log(err));
-			// this.components.children[index] = updatedComponent;
+				if (!this.roadmap.components.children) {
+					this.roadmap.components.children = [];
+				}
+
+				this.currentComponent = { 
+					type, 
+					typeLong,
+					children: [],
+					code: "New " + typeLong,
+					description: "",
+					position: components[components.length -1] ? components[components.length -1].position + 1 : 0,
+					roadmapGuid: this.roadmap.guid,
+					expanded: true,
+					guid: components.length, // Temporary to prevent vue key warning
+				};
+				const index = this.roadmap.components.push(this.currentComponent) - 1;
+
+				// Saves created component to backend and updates local copy of the component
+				const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
+				.catch(err => console.log(err));
+
+				this.roadmap.components[index].guid = createdComponentGuid;
+
+			} else { // If it's not a new component
+
+				const component = JSON.parse(e.dataTransfer.getData("component"));
+
+				console.log(component)
+				const newPosition = components[components.length -1] ? components[components.length -1].position : 0;
+				console.log(newPosition)
+
+				for (let i = 0, length = components.length; i < length; i++) {
+					if (components[i].guid === component.guid) {
+						this.roadmap.components[i].position = newPosition;
+						this.roadmap.changed = !this.roadmap.changed;
+						break;
+					}
+				}
+			}
 		},
-			
+
 
 	},
 	async fetch() {

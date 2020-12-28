@@ -41,18 +41,15 @@
 			</div>
 
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
-				<!-- <div class="bar" v-for="item in components">
-					<div class="progress-estimate"></div>
-					<span>{{ item.type }}</span>
-				</div> -->
 
 				<ul class="blocks">
 				  <Block :block="components"></Block>
 				</ul>
 			</div>
-			
-			
 		</div>
+
+		<!-- Edit Panel -->
+
 		<div class="edit-panel" v-if="editorShown">
 			<div class="edit-name">
 				<h2>Phase #1</h2>
@@ -230,11 +227,54 @@ export default {
       e.dataTransfer.setData("isnew", true);
 		},
 		// Dropping items in to a top level empty space
-		async onDropEmpty(e) {
+		onDropEmpty(e) {
 			const type = e.dataTransfer.getData("type");
 			const isNew = e.dataTransfer.getData("isNew");
 
 			if (!type) return;
+
+			const components = this.roadmap.components;
+
+			// If it's a new component
+			if (isNew) {
+				this.addNewComponent(components, type);
+			} else {
+
+				const component = JSON.parse(e.dataTransfer.getData("component"));
+
+				// Move endpoint index starts from 1
+				const newPosition = this.findEndPosition(components) + 1;
+
+				for (let i = 0, length = components.length; i < length; i++) {
+					if (components[i].guid === component.guid) {
+						components[i].position = newPosition;
+						this.saveMove([components[i].guid], newPosition, "00000000-0000-0000-0000-000000000000");
+					} else {
+						components[i].position--;
+					}
+				}
+				this.roadmapChanged = !this.roadmapChanged;
+			}
+		},
+
+		onDropChild(item) {
+			console.log(item);
+
+			if (!item.type) return;
+
+			const components = this.roadmap.components;
+
+			if (item.isNew) {
+				// addNewComponent(components, item.type);
+			}
+		},
+		onDropSibling(item) {
+			console.log(item);
+
+			if (!item.type) return;
+		},
+
+		async addNewComponent(components, type) {
 
 			let typeLong;
 			switch(type) {
@@ -244,51 +284,41 @@ export default {
 				case "ML": typeLong = "Milestone"; break;
 			}
 
-			const components = this.roadmap.components;
+			if (!components.children) {
+					components.children = [];
+			}
+			const newPosition = this.findEndPosition(components) + 1;
 
-			// If it's a new component
-			if (isNew) {
+			this.currentComponent = { 
+				type, 
+				typeLong,
+				children: [],
+				code: "New " + typeLong,
+				description: "",
+				position: newPosition,
+				roadmapGuid: this.roadmap.guid,
+				expanded: true,
+				guid: components.length, // Temporary to prevent vue key warning
+			};
+			const index = components.push(this.currentComponent) - 1;
+			this.roadmapChanged = !this.roadmapChanged;
 
-				if (!this.roadmap.components.children) {
-					this.roadmap.components.children = [];
-				}
+			// Saves created component to backend and updates local copy of the component
+			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
+			.catch(err => console.log(err));
 
-				this.currentComponent = { 
-					type, 
-					typeLong,
-					children: [],
-					code: "New " + typeLong,
-					description: "",
-					position: components[components.length -1] ? components[components.length -1].position + 1 : 0,
-					roadmapGuid: this.roadmap.guid,
-					expanded: true,
-					guid: components.length, // Temporary to prevent vue key warning
-				};
-				const index = this.roadmap.components.push(this.currentComponent) - 1;
-				this.roadmapChanged = !this.roadmapChanged;
+			components[index].guid = createdComponentGuid;
+			this.roadmapChanged = !this.roadmapChanged;
+		},
 
-				// Saves created component to backend and updates local copy of the component
-				const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
-				.catch(err => console.log(err));
-
-				this.roadmap.components[index].guid = createdComponentGuid;
-				this.roadmapChanged = !this.roadmapChanged;
-
-			} else { // If it's not a new component
-
-				const component = JSON.parse(e.dataTransfer.getData("component"));
-
-				const newPosition = components[components.length -1] ? components[components.length -1].position + 1 : 0;
-
-				for (let i = 0, length = components.length; i < length; i++) {
-					if (components[i].guid === component.guid) {
-						components[i].position = newPosition;
-						this.roadmapChanged = !this.roadmapChanged;
-						this.saveMove([components[i].guid], newPosition, "00000000-0000-0000-0000-000000000000");
-						break;
-					}
+		findEndPosition(array) {
+			let newPosition = 0;
+			for (let i = 0, length = array.length; i < length; i++) {
+				if (array[i].position > newPosition) {
+					newPosition = array[i].position;
 				}
 			}
+			return newPosition;
 		},
 
 		saveMove(items, newPosition, newParentGuid ) {
@@ -301,6 +331,9 @@ export default {
 
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
 			.catch(err => console.log(err));
+		},
+		log() {
+			console.log("HERE");
 		}
 
 
@@ -310,6 +343,19 @@ export default {
 		this.roadmaps = await this.$axios.$get("/api/roadmaps")
 		.catch(err => console.log(err));
 	},
+
+	mounted() {
+		this.$nuxt.$on("dropchild", item => {
+			this.onDropChild(item);
+    });
+    this.$nuxt.$on("dropsibling", item => {
+    	this.onDropSibling(item);
+    });
+	},
+	beforeDestroy() {
+    this.$nuxt.$off("dropchild");
+    this.$nuxt.$off("dropsibling");
+  },
 };
 </script>
 
@@ -485,6 +531,7 @@ export default {
 .components h3 {
 	font-size: 1.1rem;
 	margin-top: 0;
+	margin-left: 0.8rem;
 }
 
 .components .duration {
@@ -526,6 +573,12 @@ ul.blocks > li:first-child {
   border: none;
 }
 
+#top-drop-zone {
+	background-color: red;
+	height: 100px;
+	width: 100px;
+}
+
 /************************Edit Panel**********************/
 
 .edit-panel {
@@ -547,7 +600,7 @@ ul.blocks > li:first-child {
 	position: fixed;
 	width: 100vw;
 	height: 100vh;
-	z-index: 100;
+	z-index: 500;
 	background-color: rgba(0,0,0,0);
 }
 
@@ -561,7 +614,7 @@ ul.blocks > li:first-child {
 	left: 35vw;
 	border-radius: 10px;
 	background-color: #ded7b1;
-	z-index: 150;
+	z-index: 600;
 	color: black;
 }
 

@@ -4,8 +4,8 @@
   	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
   	<span v-if="!block.children.length && block.code" class="placeholder"></span>
     <span class="block" @click="expand(); toggleSign();" v-if="block.guid" draggable
-        @dragstart="startDrag($event)">{{ blockName }}</span>
-    <div class="drop-zone" @click="log()"></div>
+        @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragover.prevent @dragenter.prevent>{{ blockName }}</span>
+    <div class="drop-zone" @drop="onDropSibling($event)" @dragover.prevent @dragenter.prevent @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
       <block v-for="child in block.children" v-bind:block="child":key="child.guid"></block>
@@ -47,7 +47,53 @@
       	e.dataTransfer.effectAllowed = "move";
       	e.dataTransfer.setData("type", this.block.type);
 				e.dataTransfer.setData("component", JSON.stringify(this.block));
-	    }
+	    },
+	    onDropChild(e) {
+	    	// Stop drop event from being handled by parent element
+	    	e.stopPropagation();
+
+	    	const component = JSON.parse(e.dataTransfer.getData("component"));
+	    	const type = e.dataTransfer.getData("type");
+	    	const isNew = e.dataTransfer.getData("isNew");
+	    	const parentGuid = this.block.guid;
+	    	const position = this.block.children.length;
+
+	    	// Prevent dropping an item in to itself
+	    	if (component.guid === parentGuid) {
+	    		return;
+	    	}
+
+	    	const item = {
+	    		component,
+	    		type,
+	    		isNew,
+	    		parentGuid,
+	    		position,
+	    	}
+	    	$nuxt.$emit("dropchild", item);
+	    },
+	    onDropSibling(e) {
+	    	e.stopPropagation();
+	    	const component = JSON.parse(e.dataTransfer.getData("component"));
+	    	const type = e.dataTransfer.getData("type");
+	    	const isNew = e.dataTransfer.getData("isNew");
+	    	const parentGuid = this.block.parentGuid;
+	    	const position = this.block.position + 1;
+
+	    	// Prevent dropping an item in to itself
+	    	if (component.guid === this.block.guid) {
+	    		return;
+	    	}
+
+	    	const item = {
+	    		component,
+	    		type,
+	    		isNew,
+	    		parentGuid,
+	    		position,
+	    	}
+	    	$nuxt.$emit("dropsibling", item);
+	    },
 	  },
 	};
 
@@ -68,6 +114,7 @@
 	  position: relative;
 	  bottom: 4px;
 	  width: 150px;
+	  z-index: 200;
 	}
 
 	ul.sub-blocks {
@@ -104,6 +151,7 @@
 		background-color: yellow;
 		position: relative;
 		bottom: 4px;
+		z-index: 200;
 	}
 
 </style>

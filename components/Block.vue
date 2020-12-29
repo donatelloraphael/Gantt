@@ -60,8 +60,19 @@
 	    	const position = this.block.children.length ? this.block.children[this.block.children.length - 1].position + 1 : this.block.position + 1;
 
 	    	// Prevent dropping an item in to itself or its children
-	    	if (component.guid === parentGuid || component.guid === this.block.parentGuid) {
+	    	if (component.guid === parentGuid || component.guid === this.block.parentGuid || component.parentGuid === this.block.guid) {
 	    		return;
+	    	}
+
+	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
+	    	if (this.block.type === "SE") {
+	    		if (component.type === "PH") {
+	    			return;
+	    		}
+	    	} else if (this.block.type === "AC") {
+	    		if (component.type === "PH" || component.type === "SE") {
+	    			return;
+	    		}
 	    	}
 
 	    	const item = {
@@ -82,9 +93,20 @@
 	    	const parentGuid = this.block.parentGuid;
 	    	const position = this.block.position + 1;
 
-	    	// Prevent dropping an item in to itself or its children
-	    	if (component.guid === this.block.guid || component.guid === this.block.parentGuid) {
+	    	// Prevent dropping an item in to itself or its children or its parent
+	    	if (component.guid === this.block.guid || component.guid === this.block.parentGuid || component.parentGuid === this.block.guid) {
 	    		return;
+	    	}
+
+	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
+	    	if (this.block.type === "SE") {
+	    		if (component.type === "PH") {
+	    			return;
+	    		}
+	    	} else if (this.block.type === "AC") {
+	    		if (component.type === "PH" || component.type === "SE") {
+	    			return;
+	    		}
 	    	}
 
 	    	const item = {

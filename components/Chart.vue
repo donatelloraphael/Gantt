@@ -265,14 +265,15 @@ export default {
 		},
 
 		onDropChild(item) {
-			console.log(item);
-
 			if (!item.type) return;
 
 			const components = this.roadmap.components;
 
 			if (item.isNew) {
 				this.addNewComponent(components, item.type, item.position, item.parentGuid);
+
+			} else {
+				console.log(item);
 			}
 		},
 		onDropSibling(item) {

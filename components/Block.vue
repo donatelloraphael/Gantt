@@ -8,7 +8,7 @@
     <div class="drop-zone" @drop="onDropSibling($event)" @dragover.prevent @dragenter.prevent @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
-      <block v-for="child in block.children" v-bind:block="child":key="child.guid"></block>
+      <block v-for="(child, index) in block.children" :block="child":key="index"></block>
     </ul>
   </li>
 </template>
@@ -49,17 +49,18 @@
 				e.dataTransfer.setData("component", JSON.stringify(this.block));
 	    },
 	    onDropChild(e) {
+
 	    	// Stop drop event from being handled by parent element
 	    	e.stopPropagation();
 
-	    	const component = JSON.parse(e.dataTransfer.getData("component"));
+	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
 	    	const parentGuid = this.block.guid;
-	    	const position = this.block.children.length;
+	    	const position = this.block.children.length ? this.block.children[this.block.children.length - 1].position + 1 : this.block.position + 1;
 
-	    	// Prevent dropping an item in to itself
-	    	if (component.guid === parentGuid) {
+	    	// Prevent dropping an item in to itself or its children
+	    	if (component.guid === parentGuid || component.guid === this.block.parentGuid) {
 	    		return;
 	    	}
 
@@ -74,14 +75,15 @@
 	    },
 	    onDropSibling(e) {
 	    	e.stopPropagation();
-	    	const component = JSON.parse(e.dataTransfer.getData("component"));
+
+	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
 	    	const parentGuid = this.block.parentGuid;
 	    	const position = this.block.position + 1;
 
-	    	// Prevent dropping an item in to itself
-	    	if (component.guid === this.block.guid) {
+	    	// Prevent dropping an item in to itself or its children
+	    	if (component.guid === this.block.guid || component.guid === this.block.parentGuid) {
 	    		return;
 	    	}
 

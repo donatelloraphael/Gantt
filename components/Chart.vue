@@ -88,7 +88,7 @@ export default {
 		return {
 			roadmaps: [],
 			roadmap: { title: "Roadmap", description: "Roadmap details", components: []},
-			roadmapChanged: false,
+			roadmapChanged: 0,
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
@@ -104,7 +104,7 @@ export default {
 	watch: {
 		roadmapChanged() {
 			this.components = this.transformComponents(this.roadmap.components);
-			console.log("this.components");
+			this.$forceUpdate();
 		},
 	},
 	methods: {
@@ -148,7 +148,7 @@ export default {
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
 				this.roadmap = result;
-				this.roadmapChanged = !this.roadmapChanged;
+				this.roadmapChanged++;
 			}).catch(err => console.log(err));
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
@@ -237,7 +237,10 @@ export default {
 
 			// If it's a new component
 			if (isNew) {
-				this.addNewComponent(components, type);
+				
+				const newPosition = this.findEndPosition(components) + 1;
+				this.addNewComponent(components, type, newPosition);
+
 			} else {
 
 				const component = JSON.parse(e.dataTransfer.getData("component"));
@@ -253,7 +256,7 @@ export default {
 						components[i].position--;
 					}
 				}
-				this.roadmapChanged = !this.roadmapChanged;
+				this.roadmapChanged++;
 			}
 		},
 
@@ -265,7 +268,7 @@ export default {
 			const components = this.roadmap.components;
 
 			if (item.isNew) {
-				// addNewComponent(components, item.type);
+				this.addNewComponent(components, item.type, item.position, item.parentGuid);
 			}
 		},
 		onDropSibling(item) {
@@ -274,7 +277,7 @@ export default {
 			if (!item.type) return;
 		},
 
-		async addNewComponent(components, type) {
+		async addNewComponent(components, type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
 
 			let typeLong;
 			switch(type) {
@@ -287,28 +290,30 @@ export default {
 			if (!components.children) {
 					components.children = [];
 			}
-			const newPosition = this.findEndPosition(components) + 1;
 
 			this.currentComponent = { 
 				type, 
 				typeLong,
+				parentGuid,
 				children: [],
 				code: "New " + typeLong,
 				description: "",
 				position: newPosition,
 				roadmapGuid: this.roadmap.guid,
 				expanded: true,
-				guid: components.length, // Temporary to prevent vue key warning
 			};
 			const index = components.push(this.currentComponent) - 1;
-			this.roadmapChanged = !this.roadmapChanged;
+			this.roadmapChanged++;
+			console.log(index);
 
+			console.log("CUR ", this.currentComponent);
 			// Saves created component to backend and updates local copy of the component
 			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
 			.catch(err => console.log(err));
 
+			this.currentComponent.guid = createdComponentGuid;
 			components[index].guid = createdComponentGuid;
-			this.roadmapChanged = !this.roadmapChanged;
+			this.roadmapChanged++;
 		},
 
 		findEndPosition(array) {

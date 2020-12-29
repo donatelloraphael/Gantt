@@ -43,7 +43,7 @@
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 
 				<ul class="blocks">
-				  <Block :block="components"></Block>
+				  <Block :block="components" :key="refreshGraph"></Block>
 				</ul>
 			</div>
 		</div>
@@ -89,6 +89,7 @@ export default {
 			roadmaps: [],
 			roadmap: { title: "Roadmap", description: "Roadmap details", components: []},
 			roadmapChanged: 0,
+			refreshGraph: 0,
 			createRoadmapDialog: false,
 			roadmapTitle: "",
 			roadmapDescription: "",
@@ -104,7 +105,7 @@ export default {
 	watch: {
 		roadmapChanged() {
 			this.components = this.transformComponents(this.roadmap.components);
-			this.$forceUpdate();
+			this.refreshGraph++;
 		},
 	},
 	methods: {
@@ -153,6 +154,7 @@ export default {
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
+			console.log(components);
 
 			// Add the children array containing guids to components
 			(function addChildren () {
@@ -161,6 +163,8 @@ export default {
 				for (let i = 0, m = components.length; i < m; i++) {
 					if (!components[i].children) {
 						components[i].children = [];
+					} else {
+						components[i].children.length = 0;
 					}
 					for (let j = 0; j < m; j++) {
 						if (components[i].parentGuid === components[j].guid) {
@@ -278,7 +282,6 @@ export default {
 		},
 
 		async addNewComponent(components, type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
-
 			let typeLong;
 			switch(type) {
 				case "PH": typeLong = "Phase"; break;
@@ -287,14 +290,11 @@ export default {
 				case "ML": typeLong = "Milestone"; break;
 			}
 
-			if (!components.children) {
-					components.children = [];
-			}
-
-			this.currentComponent = { 
+			const newComponent = { 
 				type, 
 				typeLong,
 				parentGuid,
+				guid: undefined,
 				children: [],
 				code: "New " + typeLong,
 				description: "",
@@ -302,17 +302,16 @@ export default {
 				roadmapGuid: this.roadmap.guid,
 				expanded: true,
 			};
-			const index = components.push(this.currentComponent) - 1;
-			this.roadmapChanged++;
-			console.log(index);
 
-			console.log("CUR ", this.currentComponent);
+			console.log("NEW ", newComponent);
 			// Saves created component to backend and updates local copy of the component
-			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${this.currentComponent.typeLong}s`, this.currentComponent)
+			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${newComponent.typeLong}s`, newComponent)
 			.catch(err => console.log(err));
 
-			this.currentComponent.guid = createdComponentGuid;
-			components[index].guid = createdComponentGuid;
+			newComponent.guid = createdComponentGuid;
+			components.push(newComponent);
+
+			this.currentComponent = Object.create(newComponent);
 			this.roadmapChanged++;
 		},
 

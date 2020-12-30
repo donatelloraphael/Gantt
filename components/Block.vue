@@ -56,11 +56,10 @@
 	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
-	    	const parentGuid = this.block.guid;
-	    	const position = this.block.children.length ? this.block.children[this.block.children.length - 1].position + 1 : this.block.position + 1;
+	    	const newParent = this.block;
 
 	    	// Prevent dropping an item in to itself or its children
-	    	if (component.guid === parentGuid || component.guid === this.block.parentGuid || component.parentGuid === this.block.guid) {
+	    	if (component.guid === newParent.guid || component.guid === this.block.parentGuid || component.parentGuid === newParent.guid) {
 	    		return;
 	    	}
 
@@ -79,8 +78,7 @@
 	    		component,
 	    		type,
 	    		isNew,
-	    		parentGuid,
-	    		position,
+	    		newParent,
 	    	}
 	    	$nuxt.$emit("dropchild", item);
 	    },
@@ -90,11 +88,11 @@
 	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
-	    	const parentGuid = this.block.parentGuid;
+	    	const newParent = this.block;
 	    	const position = this.block.position + 1;
 
 	    	// Prevent dropping an item in to itself or its children or its parent
-	    	if (component.guid === this.block.guid || component.guid === this.block.parentGuid || component.parentGuid === this.block.guid) {
+	    	if (component.guid === newParent.guid || component.guid === this.block.parentGuid || component.parentGuid === newParent.guid) {
 	    		return;
 	    	}
 
@@ -113,7 +111,7 @@
 	    		component,
 	    		type,
 	    		isNew,
-	    		parentGuid,
+	    		newParent,
 	    		position,
 	    	}
 	    	$nuxt.$emit("dropsibling", item);

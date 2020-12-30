@@ -104,8 +104,11 @@ export default {
 	},
 	watch: {
 		roadmapChanged() {
+			console.log("ROADMAP", this.roadmap.components);
+
 			this.components = this.transformComponents(this.roadmap.components);
 			this.refreshGraph++;
+			console.log("COMP", this.components);
 		},
 	},
 	methods: {
@@ -154,8 +157,6 @@ export default {
 		},
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
-			console.log(components);
-
 			// Add the children array containing guids to components
 			(function addChildren () {
 
@@ -230,6 +231,7 @@ export default {
       e.dataTransfer.setData("type", type);
       e.dataTransfer.setData("isnew", true);
 		},
+
 		// Dropping items in to a top level empty space
 		onDropEmpty(e) {
 			const type = e.dataTransfer.getData("type");
@@ -257,31 +259,59 @@ export default {
 						components[i].position = newPosition;
 						this.saveMove([components[i].guid], newPosition, "00000000-0000-0000-0000-000000000000");
 					} else {
-						components[i].position--;
+						if (components[i].position > component.position) {
+							components[i].position--;
+						}
 					}
 				}
 				this.roadmapChanged++;
 			}
 		},
 
+		// On dropping in to a component as its child
 		onDropChild(item) {
 			if (!item.type) return;
 
 			const components = this.roadmap.components;
 
 			if (item.isNew) {
-				this.addNewComponent(components, item.type, item.position, item.parentGuid);
+				this.addNewComponent(components, item.type, item.position, item.newParent.guid);
 
+			} else {
+				console.log(item);
+
+				const numItemsToMove = this.findNumItemsInNode(item.component);
+				const beginPosition = item.component.position;
+				const endPosition = item.component.position + numItemsToMove - 1;
+				const childrenInParent = this.findNumItemsInNode(item.newParent);
+				const newPosition = item.newParent.position + childrenInParent;
+				const newParentGuid = item.newParent.guid;
+
+				console.log("NUM", numItemsToMove);
+				console.log("BEG",beginPosition);
+				console.log("END", endPosition);
+				console.log("NEW", newPosition);
+				console.log("PARENT", newParentGuid);
+
+				this.moveComponents(numItemsToMove, beginPosition, endPosition, childrenInParent, newPosition, newParentGuid);
+			}
+		},
+
+		// On dropping to space below an item as its sibling
+		onDropSibling(item) {
+			if (!item.type) return;
+
+			const components = this.roadmap.components;
+
+			if (item.isNew) {
+				this.addNewComponent(components, item.type, item.position, item.newParentGuid);
+			
 			} else {
 				console.log(item);
 			}
 		},
-		onDropSibling(item) {
-			console.log(item);
 
-			if (!item.type) return;
-		},
-
+		// Create and save a new component
 		async addNewComponent(components, type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
 			let typeLong;
 			switch(type) {
@@ -304,7 +334,6 @@ export default {
 				expanded: true,
 			};
 
-			console.log("NEW ", newComponent);
 			// Saves created component to backend and updates local copy of the component
 			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${newComponent.typeLong}s`, newComponent)
 			.catch(err => console.log(err));
@@ -316,16 +345,76 @@ export default {
 			this.roadmapChanged++;
 		},
 
-		findEndPosition(array) {
-			let newPosition = 0;
-			for (let i = 0, length = array.length; i < length; i++) {
-				if (array[i].position > newPosition) {
-					newPosition = array[i].position;
+		// Move the provided component along with any child components to new position
+		moveComponents(numItemsToMove, beginPosition, endPosition, childrenInParent, newPosition, newParentGuid) {
+			const components = this.roadmap.components;
+			const lastPosition = newPosition - numItemsToMove;
+
+			for (let i = 0, length = components.length; i < length; i++) {
+				if (components[i].position >= beginPosition && components[i].position <= endPosition) {
+					components[i].position += lastPosition;
+					components[i].parentGuid = newParentGuid;
+
+				} else if (components[i].position > endPosition && components[i].position < newPosition) {
+					components[i].position -= numItemsToMove;
+				}
+
+				if (components[i].position === newPosition - childrenInParent) {
+					components[i].expanded = true;
 				}
 			}
-			return newPosition;
+			this.roadmapChanged++;
+
 		},
 
+		// Move the provided component along with any child components to new position
+		// moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid) {
+		// 	const components = this.roadmap.components;
+		// 	const originalArray = Array.from(components);
+		// 	const lastPosition = newPosition + numItemsToMove;
+
+		// 	for (let i = 0, length = originalArray.length; i < length; i++) {
+
+		// 		if (originalArray[i].position >= beginPosition && originalArray[i].position <= endPosition) {
+					
+		// 			components[i].position = originalArray[i].position + newPosition;
+		// 			components[i].parentGuid = newParentGuid;
+
+		// 		} else if (originalArray[i].position > endPosition) {
+		// 			components[i].position = originalArray[i].position - numItemsToMove;
+		// 		}
+
+		// 		if (originalArray[i].position > newPosition) {
+		// 			components[i].position = originalArray[i].position + newPosition;
+		// 		}
+				
+		// 	}
+		// 	this.roadmapChanged++;
+
+		// },
+
+		// Finds the highest position of the array
+		findEndPosition(array) {
+			let endPosition = 0;
+			for (let i = 0, length = array.length; i < length; i++) {
+				if (array[i].position > endPosition) {
+					endPosition = array[i].position;
+				}
+			}
+			return endPosition;
+		},
+
+		// Recursively find the number of items in a node
+		findNumItemsInNode(node, numItems = 0) {
+			numItems++;
+
+			for (let i = 0, length = node.children.length; i < length; i++) {
+				numItems = this.findNumItemsInNode(node.children[i], numItems);
+			}
+			return numItems;
+		},
+
+		// Moves a component to a new position in the backend
 		saveMove(items, newPosition, newParentGuid ) {
 			const body = {
 				roadmapGuid: this.roadmap.guid,

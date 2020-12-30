@@ -10,8 +10,8 @@
 				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
 			<!-- <button class="roadmap positive">Save Roadmap</button> -->
-			<button class="roadmap negative">Delete Roadmap</button>
-			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Toggle Editor</button>
+			<!-- <button class="roadmap negative">Delete Roadmap</button> -->
+			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Edit</button>
 		</div>
 
 		<!-- Operations -->
@@ -43,7 +43,7 @@
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 
 				<ul class="blocks">
-				  <Block :block="components" :key="refreshGraph"></Block>
+				  <Block :block="components" :component="currentComponent" :key="refreshGraph" @componentCheck="populateChecked"></Block>
 				</ul>
 			</div>
 		</div>
@@ -52,7 +52,7 @@
 
 		<div class="edit-panel" v-if="editorShown">
 			<div class="edit-name">
-				<h2>Phase #1</h2>
+				<h2>{{ currentComponent.code }}</h2>
 			</div>
 		</div>
 
@@ -95,8 +95,9 @@ export default {
 			roadmapDescription: "",
 			editorShown: false,
 			components: { expanded: true, children: [] },
-			currentComponent: {},
+			currentComponent: { code: "Edit"},
 			componentsPanelDisabled: true,
+			checkedComponents: [],
 		};
 	},
 	components: {
@@ -104,11 +105,8 @@ export default {
 	},
 	watch: {
 		roadmapChanged() {
-			console.log("ROADMAP", this.roadmap.components);
-
 			this.components = this.transformComponents(this.roadmap.components);
 			this.refreshGraph++;
-			console.log("COMP", this.components);
 		},
 	},
 	methods: {
@@ -243,7 +241,7 @@ export default {
 			if (isNew) {
 				
 				const newPosition = this.findEndPosition(components) + 1;
-				this.addNewComponent(components, type, newPosition);
+				this.addNewComponent(type, newPosition);
 
 			} else {
 
@@ -252,17 +250,7 @@ export default {
 				// Move endpoint index starts from 1
 				const newPosition = this.findEndPosition(components) + 1;
 
-				for (let i = 0, length = components.length; i < length; i++) {
-					if (components[i].guid === component.guid) {
-						components[i].position = newPosition;
-						this.saveMove([components[i].guid], newPosition, "00000000-0000-0000-0000-000000000000");
-					} else {
-						if (components[i].position > component.position) {
-							components[i].position--;
-						}
-					}
-				}
-				this.roadmapChanged++;
+				this.moveComponents([component.guid], newPosition, "00000000-0000-0000-0000-000000000000");
 			}
 		},
 
@@ -272,12 +260,17 @@ export default {
 
 			const components = this.roadmap.components;
 
+			// newParent is null if eventTargetType is 'sibling'
+			let newParent = item.newParent; 
+
     	// Prevent dropping Phases and Sections to Actions and Phases to Sections
 			if (item.eventTargetType === "sibling") {
-				const newParentGuid = item.newParentOrSibling.parentGuid;
-
 				for (let i = 0, length = components.length; i < length; i++) {
-					if (components[i].guid === newParentGuid) {
+					if (components[i].guid === item.newParentGuid) {
+
+						// Sets newParent if event is a sibling drop
+						newParent = components[i];
+
 						if (item.type === "SE") {
 			    		if (components[i].type === "AC") {
 			    			return;
@@ -292,48 +285,32 @@ export default {
 			}
 
 			if (item.isNew) {
-				this.addNewComponent(components, item.type, item.position, item.newParent.guid);
+
+				const	position = 0;
+
+				this.addNewComponent(item.type, position, item.newParentGuid);
 
 			} else {
-				console.log(item);
 
-				const numItemsToMove = this.findNumItemsInNode(item.component);
-				const beginPosition = item.component.position;
-				const endPosition = item.component.position + numItemsToMove - 1;
-				
-				let childrenInParent;
 				let newPosition;
-				let newParentGuid;
-
-				let newSibling;
-				let newParent;
 
 				if (item.eventTargetType === "child") {
-					newParent = item.newParentOrSibling;
 
-					childrenInParent = this.findNumItemsInNode(newParent);
+					const childrenInParent = this.findNumItemsInNode(newParent);
 					newPosition = newParent.position + childrenInParent;
-					newParentGuid = newParent.guid;
 
+				} else if (item.eventTargetType === "sibling") {
+					newPosition = item.newSibling.position + 1;
 				} else {
-					newSibling = item.newParentOrSibling;
-
-					newPosition = newSibling.position;
-					newParentGuid = newSibling.parentGuid;
+					newPosition = 0;
 				}
 
-				console.log("NUM", numItemsToMove);
-				console.log("BEG",beginPosition);
-				console.log("END", endPosition);
-				console.log("NEW", newPosition);
-				console.log("PARENT", newParentGuid);
-
-				this.moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid, item.eventTargetType);
+				this.moveComponents([item.component.guid], newPosition, item.newParentGuid);
 			}
 		},
 
 		// Create and save a new component
-		async addNewComponent(components, type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
+		async addNewComponent(type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
 			let typeLong;
 			switch(type) {
 				case "PH": typeLong = "Phase"; break;
@@ -355,58 +332,22 @@ export default {
 				expanded: true,
 			};
 
+			if (type === "AC") {
+				newComponent.dependencies = [];
+				newComponent.startDateTime = null;
+				newComponent.estimatedDuration = 0;
+				newComponent.status = disabled;
+				newComponent.progress = 0;
+			}
+
 			// Saves created component to backend and updates local copy of the component
 			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${newComponent.typeLong}s`, newComponent)
 			.catch(err => console.log(err));
 
 			newComponent.guid = createdComponentGuid;
-			components.push(newComponent);
-
 			this.currentComponent = Object.create(newComponent);
-			this.roadmapChanged++;
-		},
 
-		// Move the provided component along with any child components to new position
-		moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid, eventTargetType) {
-			const components = this.roadmap.components;
-			let lastPosition;
-
-			if (eventTargetType === "child") {
-				lastPosition = newPosition - numItemsToMove;
-
-				for (let i = 0, length = components.length; i < length; i++) {
-					if (components[i].position === beginPosition) {
-							components[i].parentGuid = newParentGuid;
-					}
-
-					if (components[i].position >= beginPosition && components[i].position <= endPosition) {
-						components[i].position += lastPosition;
-
-					} else if (components[i].position > endPosition && components[i].position < newPosition) {
-						components[i].position -= numItemsToMove;
-					}
-				}
-			} else if (eventTargetType === "sibling") {
-				lastPosition = newPosition;
-				console.log("LAS", lastPosition);
-
-				for (let i = 0, length = components.length; i < length; i++) {
-					if (components[i].position === beginPosition) {
-							components[i].parentGuid = newParentGuid;
-					}
-
-					if (components[i].position >= beginPosition && components[i].position <= endPosition) {
-						console.log("POS", components[i].position)
-						components[i].position = lastPosition;
-						lastPosition++;
-
-					} else if (components[i].position > endPosition && components[i].position < newPosition) {
-						components[i].position -= numItemsToMove;
-					}
-				}
-			}
-			
-			this.roadmapChanged++;
+			this.getRoadmap(this.roadmap.guid);
 		},
 
 		// Finds the highest position of the array
@@ -430,8 +371,8 @@ export default {
 			return numItems;
 		},
 
-		// Moves a component to a new position in the backend
-		saveMove(items, newPosition, newParentGuid ) {
+		// Moves components to a new position
+		moveComponents(items, newPosition, newParentGuid ) {
 			const body = {
 				roadmapGuid: this.roadmap.guid,
 				items,
@@ -440,10 +381,32 @@ export default {
 			};
 
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
+			.then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));
 		},
-		log() {
-			console.log("HERE");
+
+		// Maintains an array of checked components
+		populateChecked(item) {
+			if (item.checked) {
+				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
+					if (this.checkedComponents[i].guid === item.component.guid) {
+						return;
+					}
+				}
+				this.checkedComponents.push(item.component);
+				this.currentComponent = Object.create(item.component);
+				this.editorShown = true;
+
+			} else {
+				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
+					if (this.checkedComponents[i].guid === item.component.guid) {
+						this.checkedComponents.splice(i, 1);
+						this.currentComponent = { code: "Edit" };
+						this.editorShown = false;
+						return;
+					}
+				}
+			}
 		}
 	},
 
@@ -457,10 +420,15 @@ export default {
 		this.$nuxt.$on("triggerdrop", item => {
 			this.onDropEvent(item);
     });
+
+    this.$nuxt.$on("componentcheck", item => {
+    	this.populateChecked(item);
+    });
 	},
 
 	beforeDestroy() {
     this.$nuxt.$off("triggerdrop");
+    this.$nuxt.$off("componentcheck");
   },
 };
 </script>
@@ -620,7 +588,7 @@ export default {
 
 .components .heading {
 	width: 70rem;
-	background-color: #2e3192;
+	background-color: #70af85;
 	text-align: left;
 	padding: 10px 0 10px 15px;
 	color: white;

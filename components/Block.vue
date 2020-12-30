@@ -1,14 +1,14 @@
 <template>
   <li class="block">
-  	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code">
+  	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code" v-model="isChecked" @change="emitComponent()">
   	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
   	<span v-if="!block.children.length && block.code" class="placeholder"></span>
     <span class="block" :class="[type]" @click="expand(); toggleSign();" v-if="block.guid" draggable
         @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragover.prevent @dragenter.prevent>{{ blockName }}</span>
-    <div class="drop-zone" @drop="onDropSibling($event)" @dragover.prevent @dragenter.prevent @click="log()" ></div>
+    <div class="drop-zone" @drop="onDropSibling($event); log()" @dragover.prevent @dragenter.prevent @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
-      <block v-for="(child, index) in block.children" :block="child":key="index"></block>
+      <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index"></block>
     </ul>
   </li>
 </template>
@@ -17,16 +17,20 @@
 
 	export default {
 	  name: "Block",
-	  props: ["block"],
+	  props: ["block", "component"],
 	  data() {
 	  	return {
 	  		sign: "–",
 	  		type: this.block.type,
+	  		isChecked: this.block.guid === this.component.guid,
 	  	}
 	  },
 	  computed: {
 	  	blockName() {
 				return this.block.code.length > 17 ? this.block.code.substr(0, 17) + "..." : this.block.code;
+			},
+			currentComponent() {
+				return this.component;
 			},
 	  },
 	  methods: {
@@ -44,6 +48,10 @@
 
 	    log() {
 	    	console.log(this.block);
+	    },
+
+	    emitComponent() {
+	    	$nuxt.$emit("componentcheck", { checked: this.isChecked, component: this.block });
 	    },
 
 	    startDrag(e) {
@@ -72,21 +80,37 @@
 	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
-	    	const newParentOrSibling = this.block;
+
+	    	let newParent;
+	    	let newParentGuid;
+	    	let newSibling;
+
+	    	if (eventTargetType === "child") {
+	    		newParentGuid = this.block.guid;
+	    		newParent = this.block;
+	    	} else if (eventTargetType === "sibling") {
+	    		newParentGuid = this.block.parentGuid;
+	    		newParent = null;
+	    		newSibling = this.block;
+	    		if (!this.block.code) {
+	    			eventTargetType = "root";
+	    			newParentGuid = "00000000-0000-0000-0000-000000000000"
+	    		}
+	    	}
 
 	    	// Prevent dropping an item in to itself or its children or its direct parent
-				if (component.guid === newParentOrSibling.guid || component.guid === newParentOrSibling.parentGuid || component.parentGuid === newParentOrSibling.guid) {
+				if (component.guid === newParentGuid) {
 	    		return;
 	    	}
 
 	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
 	    	if (eventTargetType === "child") {
 	    		if (this.block.type === "SE") {
-		    		if (component.type === "PH") {
+		    		if (type === "PH") {
 		    			return;
 		    		}
 		    	} else if (this.block.type === "AC") {
-		    		if (component.type === "PH" || component.type === "SE") {
+		    		if (type === "PH" || type === "SE") {
 		    			return;
 		    		}
 		    	}
@@ -96,8 +120,10 @@
 	    		component,
 	    		type,
 	    		isNew,
-	    		newParentOrSibling,
+	    		newParent,
+	    		newParentGuid,
 	    		eventTargetType,
+	    		newSibling,
 	    	}
 	    	$nuxt.$emit("triggerdrop", item);
 	    },
@@ -122,6 +148,7 @@
 	  bottom: 4px;
 	  width: 150px;
 	  z-index: 200;
+	  border-radius: 20px;
 	}
 
 	ul.sub-blocks {

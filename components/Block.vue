@@ -3,7 +3,7 @@
   	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code">
   	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
   	<span v-if="!block.children.length && block.code" class="placeholder"></span>
-    <span class="block" @click="expand(); toggleSign();" v-if="block.guid" draggable
+    <span class="block" :class="[type]" @click="expand(); toggleSign();" v-if="block.guid" draggable
         @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragover.prevent @dragenter.prevent>{{ blockName }}</span>
     <div class="drop-zone" @drop="onDropSibling($event)" @dragover.prevent @dragenter.prevent @click="log()" ></div>
 
@@ -21,6 +21,7 @@
 	  data() {
 	  	return {
 	  		sign: "–",
+	  		type: this.block.type,
 	  	}
 	  },
 	  computed: {
@@ -32,6 +33,7 @@
 	    expand() {
 	      this.block.expanded = !this.block.expanded;
 	    },
+
 	    toggleSign() {
 	    	if (this.sign === "+") {
 	    		this.sign = "–";
@@ -39,82 +41,65 @@
 	    		this.sign = "+";
 	    	}
 	    },
+
 	    log() {
 	    	console.log(this.block);
 	    },
+
 	    startDrag(e) {
 	    	e.dataTransfer.dropEffect = "move";
       	e.dataTransfer.effectAllowed = "move";
       	e.dataTransfer.setData("type", this.block.type);
 				e.dataTransfer.setData("component", JSON.stringify(this.block));
 	    },
+
 	    onDropChild(e) {
 
 	    	// Stop drop event from being handled by parent element
 	    	e.stopPropagation();
 
-	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
-	    	const type = e.dataTransfer.getData("type");
-	    	const isNew = e.dataTransfer.getData("isNew");
-	    	const newParent = this.block;
-
-	    	// Prevent dropping an item in to itself or its children
-	    	if (component.guid === newParent.guid || component.guid === this.block.parentGuid || component.parentGuid === newParent.guid) {
-	    		return;
-	    	}
-
-	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
-	    	if (this.block.type === "SE") {
-	    		if (component.type === "PH") {
-	    			return;
-	    		}
-	    	} else if (this.block.type === "AC") {
-	    		if (component.type === "PH" || component.type === "SE") {
-	    			return;
-	    		}
-	    	}
-
-	    	const item = {
-	    		component,
-	    		type,
-	    		isNew,
-	    		newParent,
-	    	}
-	    	$nuxt.$emit("dropchild", item);
+	    	this.triggerDrop(e, "child");
 	    },
-	    onDropSibling(e) {
+
+ 			onDropSibling(e) {
 	    	e.stopPropagation();
 
+	    	this.triggerDrop(e, "sibling");
+	    },
+
+	    triggerDrop(e, eventTargetType) {
+
 	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
 	    	const type = e.dataTransfer.getData("type");
 	    	const isNew = e.dataTransfer.getData("isNew");
-	    	const newParent = this.block;
-	    	const position = this.block.position + 1;
+	    	const newParentOrSibling = this.block;
 
-	    	// Prevent dropping an item in to itself or its children or its parent
-	    	if (component.guid === newParent.guid || component.guid === this.block.parentGuid || component.parentGuid === newParent.guid) {
+	    	// Prevent dropping an item in to itself or its children or its direct parent
+				if (component.guid === newParentOrSibling.guid || component.guid === newParentOrSibling.parentGuid || component.parentGuid === newParentOrSibling.guid) {
 	    		return;
 	    	}
 
 	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
-	    	if (this.block.type === "SE") {
-	    		if (component.type === "PH") {
-	    			return;
-	    		}
-	    	} else if (this.block.type === "AC") {
-	    		if (component.type === "PH" || component.type === "SE") {
-	    			return;
-	    		}
-	    	}
+	    	if (eventTargetType === "child") {
+	    		if (this.block.type === "SE") {
+		    		if (component.type === "PH") {
+		    			return;
+		    		}
+		    	} else if (this.block.type === "AC") {
+		    		if (component.type === "PH" || component.type === "SE") {
+		    			return;
+		    		}
+		    	}
+	    	}	    	
 
 	    	const item = {
 	    		component,
 	    		type,
 	    		isNew,
-	    		newParent,
-	    		position,
+	    		newParentOrSibling,
+	    		eventTargetType,
 	    	}
-	    	$nuxt.$emit("dropsibling", item);
+	    	$nuxt.$emit("triggerdrop", item);
 	    },
 	  },
 	};
@@ -170,10 +155,30 @@
 	.drop-zone {
 		width: 70vw;
 		height: 15px;
-		background-color: yellow;
+		/*background-color: yellow;*/
 		position: relative;
 		bottom: 4px;
 		z-index: 200;
+	}
+
+	.PH {
+		background-color: #433d3c;
+		color: white;
+	}
+
+	.SE {
+		background-color: #9f5f80;
+		color: white;
+	}
+
+	.AC {
+		background-color: #045762;
+		color: white;
+	}
+
+	.ML {
+		background-color: #682c0e;
+		color: white;
 	}
 
 </style>

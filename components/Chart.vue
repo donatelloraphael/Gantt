@@ -266,11 +266,30 @@ export default {
 			}
 		},
 
-		// On dropping in to a component as its child
-		onDropChild(item) {
+		// On triggering a drop event as a child or sibling
+		onDropEvent(item) {
 			if (!item.type) return;
 
 			const components = this.roadmap.components;
+
+    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
+			if (item.eventTargetType === "sibling") {
+				const newParentGuid = item.newParentOrSibling.parentGuid;
+
+				for (let i = 0, length = components.length; i < length; i++) {
+					if (components[i].guid === newParentGuid) {
+						if (item.type === "SE") {
+			    		if (components[i].type === "AC") {
+			    			return;
+			    		}
+			    	} else if (item.type === "PH") {
+			    		if (components[i].type === "SE" || components[i].type === "AC") {
+			    			return;
+			    		}
+			    	}
+					}
+				}
+			}
 
 			if (item.isNew) {
 				this.addNewComponent(components, item.type, item.position, item.newParent.guid);
@@ -281,9 +300,27 @@ export default {
 				const numItemsToMove = this.findNumItemsInNode(item.component);
 				const beginPosition = item.component.position;
 				const endPosition = item.component.position + numItemsToMove - 1;
-				const childrenInParent = this.findNumItemsInNode(item.newParent);
-				const newPosition = item.newParent.position + childrenInParent;
-				const newParentGuid = item.newParent.guid;
+				
+				let childrenInParent;
+				let newPosition;
+				let newParentGuid;
+
+				let newSibling;
+				let newParent;
+
+				if (item.eventTargetType === "child") {
+					newParent = item.newParentOrSibling;
+
+					childrenInParent = this.findNumItemsInNode(newParent);
+					newPosition = newParent.position + childrenInParent;
+					newParentGuid = newParent.guid;
+
+				} else {
+					newSibling = item.newParentOrSibling;
+
+					newPosition = newSibling.position;
+					newParentGuid = newSibling.parentGuid;
+				}
 
 				console.log("NUM", numItemsToMove);
 				console.log("BEG",beginPosition);
@@ -291,21 +328,7 @@ export default {
 				console.log("NEW", newPosition);
 				console.log("PARENT", newParentGuid);
 
-				this.moveComponents(numItemsToMove, beginPosition, endPosition, childrenInParent, newPosition, newParentGuid);
-			}
-		},
-
-		// On dropping to space below an item as its sibling
-		onDropSibling(item) {
-			if (!item.type) return;
-
-			const components = this.roadmap.components;
-
-			if (item.isNew) {
-				this.addNewComponent(components, item.type, item.position, item.newParentGuid);
-			
-			} else {
-				console.log(item);
+				this.moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid, item.eventTargetType);
 			}
 		},
 
@@ -344,26 +367,45 @@ export default {
 		},
 
 		// Move the provided component along with any child components to new position
-		moveComponents(numItemsToMove, beginPosition, endPosition, childrenInParent, newPosition, newParentGuid) {
+		moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid, eventTargetType) {
 			const components = this.roadmap.components;
-			const lastPosition = newPosition - numItemsToMove;
+			let lastPosition;
 
-			for (let i = 0, length = components.length; i < length; i++) {
-				if (components[i].position === beginPosition) {
-						components[i].parentGuid = newParentGuid;
+			if (eventTargetType === "child") {
+				lastPosition = newPosition - numItemsToMove;
+
+				for (let i = 0, length = components.length; i < length; i++) {
+					if (components[i].position === beginPosition) {
+							components[i].parentGuid = newParentGuid;
+					}
+
+					if (components[i].position >= beginPosition && components[i].position <= endPosition) {
+						components[i].position += lastPosition;
+
+					} else if (components[i].position > endPosition && components[i].position < newPosition) {
+						components[i].position -= numItemsToMove;
+					}
 				}
+			} else if (eventTargetType === "sibling") {
+				lastPosition = newPosition;
+				console.log("LAS", lastPosition);
 
-				if (components[i].position >= beginPosition && components[i].position <= endPosition) {
-					components[i].position += lastPosition;
+				for (let i = 0, length = components.length; i < length; i++) {
+					if (components[i].position === beginPosition) {
+							components[i].parentGuid = newParentGuid;
+					}
 
-				} else if (components[i].position > endPosition && components[i].position < newPosition) {
-					components[i].position -= numItemsToMove;
-				}
+					if (components[i].position >= beginPosition && components[i].position <= endPosition) {
+						console.log("POS", components[i].position)
+						components[i].position = lastPosition;
+						lastPosition++;
 
-				if (components[i].position === newPosition - childrenInParent) {
-					components[i].expanded = true;
+					} else if (components[i].position > endPosition && components[i].position < newPosition) {
+						components[i].position -= numItemsToMove;
+					}
 				}
 			}
+			
 			this.roadmapChanged++;
 		},
 
@@ -403,9 +445,8 @@ export default {
 		log() {
 			console.log("HERE");
 		}
-
-
 	},
+
 	async fetch() {
 		// Get list of roadmaps
 		this.roadmaps = await this.$axios.$get("/api/roadmaps")
@@ -413,16 +454,13 @@ export default {
 	},
 
 	mounted() {
-		this.$nuxt.$on("dropchild", item => {
-			this.onDropChild(item);
-    });
-    this.$nuxt.$on("dropsibling", item => {
-    	this.onDropSibling(item);
+		this.$nuxt.$on("triggerdrop", item => {
+			this.onDropEvent(item);
     });
 	},
+
 	beforeDestroy() {
-    this.$nuxt.$off("dropchild");
-    this.$nuxt.$off("dropsibling");
+    this.$nuxt.$off("triggerdrop");
   },
 };
 </script>
@@ -548,8 +586,8 @@ export default {
 
 .operations .phase {
 	margin-top: 50px;
-	border: 2px solid #153e90;
-	color: #153e90;
+	border: 2px solid #433d3c;
+	color: #433d3c;
 }
 
 .operations .section {
@@ -607,7 +645,7 @@ export default {
 }
 
 .components .graph-container {
-	height: 100%;
+	min-height: 100%;
 	width: 100%;
 	position: relative;
 	display: flex;
@@ -639,6 +677,10 @@ ul.blocks {
 ul.blocks > li:first-child {
   padding: 0.3rem 0 0 0;
   border: none;
+}
+
+ul.blocks {
+	margin-bottom: 50px;
 }
 
 #top-drop-zone {

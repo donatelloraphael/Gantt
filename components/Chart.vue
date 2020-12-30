@@ -155,6 +155,7 @@ export default {
 				this.roadmapChanged++;
 			}).catch(err => console.log(err));
 		},
+
 		// Converts the components array of roadmap object got from API to form that can be rendered recursively.
 		transformComponents(components) {
 			// Add the children array containing guids to components
@@ -162,14 +163,11 @@ export default {
 
 				// populate the children array of each component with guid of its children
 				for (let i = 0, m = components.length; i < m; i++) {
-					if (!components[i].children) {
-						components[i].children = [];
-					} else {
-						components[i].children.length = 0;
-					}
+					components[i].children = [];
+							
 					for (let j = 0; j < m; j++) {
-						if (components[i].parentGuid === components[j].guid) {
-							components[j].children.push(components[i].guid);
+						if (components[j].parentGuid === components[i].guid) {
+							components[i].children.push(components[j].guid);
 						}
 					}
 				}
@@ -351,9 +349,12 @@ export default {
 			const lastPosition = newPosition - numItemsToMove;
 
 			for (let i = 0, length = components.length; i < length; i++) {
+				if (components[i].position === beginPosition) {
+						components[i].parentGuid = newParentGuid;
+				}
+
 				if (components[i].position >= beginPosition && components[i].position <= endPosition) {
 					components[i].position += lastPosition;
-					components[i].parentGuid = newParentGuid;
 
 				} else if (components[i].position > endPosition && components[i].position < newPosition) {
 					components[i].position -= numItemsToMove;
@@ -364,34 +365,7 @@ export default {
 				}
 			}
 			this.roadmapChanged++;
-
 		},
-
-		// Move the provided component along with any child components to new position
-		// moveComponents(numItemsToMove, beginPosition, endPosition, newPosition, newParentGuid) {
-		// 	const components = this.roadmap.components;
-		// 	const originalArray = Array.from(components);
-		// 	const lastPosition = newPosition + numItemsToMove;
-
-		// 	for (let i = 0, length = originalArray.length; i < length; i++) {
-
-		// 		if (originalArray[i].position >= beginPosition && originalArray[i].position <= endPosition) {
-					
-		// 			components[i].position = originalArray[i].position + newPosition;
-		// 			components[i].parentGuid = newParentGuid;
-
-		// 		} else if (originalArray[i].position > endPosition) {
-		// 			components[i].position = originalArray[i].position - numItemsToMove;
-		// 		}
-
-		// 		if (originalArray[i].position > newPosition) {
-		// 			components[i].position = originalArray[i].position + newPosition;
-		// 		}
-				
-		// 	}
-		// 	this.roadmapChanged++;
-
-		// },
 
 		// Finds the highest position of the array
 		findEndPosition(array) {

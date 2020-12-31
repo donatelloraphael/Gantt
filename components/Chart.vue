@@ -11,6 +11,7 @@
 			</select>
 			<!-- <button class="roadmap positive">Save Roadmap</button> -->
 			<!-- <button class="roadmap negative">Delete Roadmap</button> -->
+			<button id="button-parallelize" :disabled="!parallelizeAvailable">Parallelize</button>
 			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Edit</button>
 		</div>
 
@@ -51,8 +52,48 @@
 		<!-- Edit Panel -->
 
 		<div class="edit-panel" v-if="editorShown">
+			<p v-if="errors.length">
+		    <b>Please correct the following error(s):</b>
+		    <ul>
+		      <li v-for="error in errors">{{ error }}</li>
+		    </ul>
+		  </p>
+
 			<div class="edit-name">
 				<h2>{{ currentComponent.code }}</h2>
+			</div>
+			<div class="edit-body">
+				<label for="name-edit">Name: </label>
+				<input type="text" name="name-edit" id="name-edit" v-model="currentComponent.code">
+
+				<label for="description-edit">Description: </label>
+				<input type="text" name="description-edit" id="description-edit" v-model="currentComponent.description">
+
+				<label for="status-edit">Status: </label>
+				<select name="status-edit" id="status-edit" disabled>
+					<option value="Created">Created</option>
+					<option value="ReadyToStart">ReadyToStart</option>
+					<option value="Started">Started</option>
+					<option value="Paused">Paused</option>
+					<option value="Ended">Ended</option>
+					<option value="Cancelled">Cancelled</option>
+					<option value="Error">Error</option>
+				</select>
+
+				<label for="date-edit">Start Date and Time: </label>
+				<input type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
+				<input type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
+
+				<label for="estimated-days" class="estimated-duration">Estimated Duration: </label>
+				<input type="number" name="estimated-days" class="estimated-duration" placeholder="Days" min="0" v-model="currentComponent.estDays">
+				<input type="number" name="estimated-hours" class="estimated-duration" placeholder="Hours" min="0" v-model="currentComponent.estHours">
+				<input type="number" name="estimated-minutes" class="estimated-duration" placeholder="Minutes" min="0" v-model="currentComponent.estMinutes">
+
+				<label for="progress">Progress: </label>
+				<input type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
+
+				<button id="save" @click="validateAndSave()">Save</button>
+
 			</div>
 		</div>
 
@@ -98,15 +139,40 @@ export default {
 			currentComponent: { code: "Edit"},
 			componentsPanelDisabled: true,
 			checkedComponents: [],
+			errors: [],
+			parallelizeAvailable: false,
+			checkedChanged: 0,
 		};
 	},
 	components: {
 		Block,
 	},
 	watch: {
+		// Transform roadmap components in to a recursive-able form
 		roadmapChanged() {
 			this.components = this.transformComponents(this.roadmap.components);
 			this.refreshGraph++;
+		},
+
+		// Set the state of parallelizeAvailable when there is a change in checked items
+		checkedChanged() {
+			let length = this.checkedComponents.length;
+
+			if (length > 1) {
+				for (let i = 0; i < length - 1; i++) {
+					if (this.checkedComponents[i].type !== "SE") {
+						this.parallelizeAvailable = false;
+						return;
+					}
+					if (this.checkedComponents[i].parentGuid !== this.checkedComponents[i+1].parentGuid) {
+						this.parallelizeAvailable = false;
+						return;
+					}
+				}
+				this.parallelizeAvailable = true;
+			} else {
+				this.parallelizeAvailable = false;
+			}
 		},
 	},
 	methods: {
@@ -232,6 +298,7 @@ export default {
 		onDropEmpty(e) {
 			const type = e.dataTransfer.getData("type");
 			const isNew = e.dataTransfer.getData("isNew");
+			const newParent = { guid: "00000000-0000-0000-0000-000000000000" };
 
 			if (!type) return;
 
@@ -241,7 +308,7 @@ export default {
 			if (isNew) {
 				
 				const newPosition = this.findEndPosition(components) + 1;
-				this.addNewComponent(type, newPosition);
+				this.addNewComponent(type, newPosition, newParent);
 
 			} else {
 
@@ -288,7 +355,7 @@ export default {
 
 				const	position = 0;
 
-				this.addNewComponent(item.type, position, item.newParentGuid);
+				this.addNewComponent(item.type, position, newParent, item.eventTargetType);
 
 			} else {
 
@@ -305,12 +372,12 @@ export default {
 					newPosition = 0;
 				}
 
-				this.moveComponents([item.component.guid], newPosition, item.newParentGuid);
+				this.moveComponents([item.component.guid], newPosition, item.eventTargetType, newParent);
 			}
 		},
 
 		// Create and save a new component
-		async addNewComponent(type, newPosition, parentGuid = "00000000-0000-0000-0000-000000000000") {
+		async addNewComponent(type, newPosition, newParent, eventTargetType = "child") {
 			let typeLong;
 			switch(type) {
 				case "PH": typeLong = "Phase"; break;
@@ -322,7 +389,7 @@ export default {
 			const newComponent = { 
 				type, 
 				typeLong,
-				parentGuid,
+				parentGuid: newParent.guid,
 				guid: undefined,
 				children: [],
 				code: "New " + typeLong,
@@ -336,7 +403,7 @@ export default {
 				newComponent.dependencies = [];
 				newComponent.startDateTime = null;
 				newComponent.estimatedDuration = 0;
-				newComponent.status = disabled;
+				newComponent.status = "Created";
 				newComponent.progress = 0;
 			}
 
@@ -346,8 +413,22 @@ export default {
 
 			newComponent.guid = createdComponentGuid;
 			this.currentComponent = Object.create(newComponent);
+			this.editorShown = true;
 
 			this.getRoadmap(this.roadmap.guid);
+
+			// Needs to implement API to add dependencies of acions without requiring unnecessary data
+
+			// if (type === "AC" && newParent.type === "AC" && eventTargetType === "child") {
+			// 	let parentComponent = {
+			// 		guid: newParent.guid,
+			// 		roadmapGuid: this.roadmap.guid,
+			// 		dependencies: [newComponent.guid],
+			// 	};
+
+			// 	this.$axios.$put(`/api/roadmaps/${this.roadmap.guid}/Actions/${newParent.guid}`, parentComponent)
+			// 	.catch(err => console.log(err));
+			// }
 		},
 
 		// Finds the highest position of the array
@@ -394,6 +475,7 @@ export default {
 					}
 				}
 				this.checkedComponents.push(item.component);
+				this.checkedChanged++;
 				this.currentComponent = Object.create(item.component);
 				this.editorShown = true;
 
@@ -401,12 +483,18 @@ export default {
 				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
 					if (this.checkedComponents[i].guid === item.component.guid) {
 						this.checkedComponents.splice(i, 1);
+						this.checkedChanged++;
 						this.currentComponent = { code: "Edit" };
 						this.editorShown = false;
 						return;
 					}
 				}
 			}
+		},
+
+		// Validates the edit panel input and saves it.
+		validateAndSave() {
+
 		}
 	},
 
@@ -506,6 +594,19 @@ export default {
  	background-repeat: no-repeat;
  	background-position: right center;
  	background-size: 12px;
+}
+
+#button-parallelize {
+	background-color: #6155a6;
+	width: 200px;
+	color: white;
+	cursor: pointer;
+	font-size: 1rem;
+}
+
+#button-parallelize:disabled {
+	background-color: grey;
+	cursor: default;
 }
 
 .menu .toggle {
@@ -663,6 +764,7 @@ ul.blocks {
 	height: 100%;
 	background-color: #f2f2f2;
 	grid-column: span 2;
+	overflow: auto;
 }
 
 .edit-name {
@@ -670,6 +772,84 @@ ul.blocks {
 	padding: 13px 0 14px 15px;
 	background-color: black;
 	color: white;
+}
+
+.edit-body {
+	padding: 10px;
+	display: flex;
+	justify-content: left;
+	flex-wrap: wrap;
+}
+
+.edit-body label {
+	width: auto;
+	display: inline-block;
+	text-align: left;
+	margin: 20px 20px 10px 0;
+}
+
+.edit-body #name-edit, #description-edit {
+	width: 100%;
+	height: 20px;
+	border-radius: 5px;
+	outline: none;
+	border: 1px solid grey;
+}
+
+.edit-body select {
+	height: 25px;
+	width: 150px;
+	margin-top: 20px;
+	border-radius: 5px;
+	outline: none;
+	border: 1px solid grey;
+	-webkit-appearance: none;
+ 	-moz-appearance: none;
+ 	appearance: none;
+ 	background-image: url("~assets/icons/arrow-down.svg");
+ 	background-repeat: no-repeat;
+ 	background-position: right center;
+ 	background-size: 12px;
+}
+
+.edit-body select + label {
+	display: block;
+	width: 100%;
+}
+
+#time-edit {
+	margin-left: 5px;
+}
+
+label.estimated-duration {
+	width: 100%;
+	display: block;
+}
+.edit-body input.estimated-duration {
+	width: 70px;
+	margin-right: 5px;
+	height: 20px;
+}
+
+#progress {
+	height: 20px;
+	width: 100px;
+	margin-top: 20px;
+}
+
+#save {
+	display: block;
+	width: 100%;
+	border-radius: 10px;
+	margin-top: 20px;
+	background-color: black;
+	color: white;
+	height: 40px;
+	font-size: 1.2rem;
+}
+
+#save:hover {
+	background-color: #141414;
 }
 
 /*************************Dialogs************************/

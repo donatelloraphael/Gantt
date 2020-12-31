@@ -11,7 +11,7 @@
 			</select>
 			<!-- <button class="roadmap positive">Save Roadmap</button> -->
 			<!-- <button class="roadmap negative">Delete Roadmap</button> -->
-			<button id="button-parallelize" :disabled="!parallelizeAvailable">Parallelize</button>
+			<button id="button-parallelize" :disabled="!parallelizeAvailable" @click="parallelize()">Parallelize</button>
 			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Edit</button>
 		</div>
 
@@ -372,7 +372,7 @@ export default {
 					newPosition = 0;
 				}
 
-				this.moveComponents([item.component.guid], newPosition, item.eventTargetType, newParent);
+				this.moveComponents([item.component.guid], newPosition, newParent.guid);
 			}
 		},
 
@@ -490,6 +490,22 @@ export default {
 					}
 				}
 			}
+		},
+
+		parallelize() {
+			const sectionsGuid = [];
+
+			for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
+				sectionsGuid.push(this.checkedComponents[i].guid);
+			}
+
+			this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/Sections/Parallelize`, {
+				roadmapGuid: this.roadmap.guid,
+				sectionsGuid,
+				ordering: 0,
+			}).then(() => this.getRoadmap(this.roadmap.guid))
+			.catch(err => console.log(err));
+
 		},
 
 		// Validates the edit panel input and saves it.

@@ -82,17 +82,19 @@
 					<option value="Error">Error</option>
 				</select>
 
-				<label for="date-edit">Start Date and Time: </label>
-				<input type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
-				<input type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
+				<div v-if="currentComponent.type === 'AC'">
+					<label for="date-edit">Start Date and Time: </label>
+					<input type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
+					<input type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
 
-				<label for="estimated-days" class="estimated-duration">Estimated Duration: </label>
-				<input type="number" name="estimated-days" class="estimated-duration" placeholder="Days" min="0" v-model="currentComponent.estDays">
-				<input type="number" name="estimated-hours" class="estimated-duration" placeholder="Hours" min="0" v-model="currentComponent.estHours">
-				<input type="number" name="estimated-minutes" class="estimated-duration" placeholder="Minutes" min="0" v-model="currentComponent.estMinutes">
+					<label for="estimated-days" class="estimated-duration">Estimated Duration: </label>
+					<input type="number" name="estimated-days" class="estimated-duration" placeholder="Days" min="0" v-model="currentComponent.estDays">
+					<input type="number" name="estimated-hours" class="estimated-duration" placeholder="Hours" min="0" v-model="currentComponent.estHours">
+					<input type="number" name="estimated-minutes" class="estimated-duration" placeholder="Minutes" min="0" v-model="currentComponent.estMinutes">
 
-				<label for="progress">Progress: </label>
-				<input type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
+					<label for="progress">Progress: </label>
+					<input type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
+				</div>
 
 				<button id="save" @click="validateAndSave()">Save</button>
 
@@ -121,10 +123,9 @@
 	</div>
 </template>
 
-
 <script>
 import Block from "./Block";
-	
+
 export default {
 	name: "Chart",
 	data() {
@@ -560,7 +561,7 @@ export default {
 				updateComponent.roadmapGuid = this.roadmap.guid;
 			}
 
-			this.$axios.put(`/api/roadmaps/${this.roadmap.guid}/${typeLong}s/${component.guid}`, updateComponent)
+			this.$axios.$put(`/api/roadmaps/${this.roadmap.guid}/${typeLong}s/${component.guid}`, updateComponent)
 			.then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));
 		},
@@ -570,14 +571,26 @@ export default {
 
 			let hours = 0, minutes = 0, seconds = 0;
 
-			const [year, month, date]  = component.startDate.split("-");
-			[hours, minutes, seconds] = component.startTime.split(":");
+			let [year, month, date]  = component.startDate ? component.startDate.split("-") : [0, 0, 0];
+			[hours, minutes, seconds] = component.startTime ? component.startTime.split(":") : [0, 0, 0];
 
-			const newDate = new Date(year, month - 1, date, hours, minutes, seconds);
+			if (month < 1 ) {
+				month = 0;
+			} else {
+				month -= 1;
+			}
 
-			component.startDateTime = newDate.getTime();
-			component.estimatedDuration = component.estDays * NUM_MINUTES_IN_DAY + component.estHours * 60 + component.estMinutes;
+			const newDate = new Date(year, month, date, hours, minutes, seconds);
 
+			if (year && month && date) {
+				component.startDateTime = newDate.getTime();
+			}
+
+			if (this.currentComponent.estDays || this.currentComponent.estHours || this.currentComponent.estMinutes) {
+				component.estimatedDuration = this.currentComponent.estDays * NUM_MINUTES_IN_DAY + this.currentComponent.estHours * 60 + parseInt(this.currentComponent.estMinutes);
+			}
+
+			component.progress = parseInt(component.progress);
 			return component;
 		}
 	},

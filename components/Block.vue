@@ -5,7 +5,7 @@
   	<span v-if="!block.children.length && block.code" class="placeholder"></span>
     <span class="block" :class="[type]" @click="expand(); toggleSign();" v-if="block.guid" draggable
         @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragover.prevent @dragenter.prevent>{{ blockName }}</span>
-    <div class="drop-zone" @drop="onDropSibling($event); log()" @dragover.prevent @dragenter.prevent @click="log()" ></div>
+    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#88FF88';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
       <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index"></block>

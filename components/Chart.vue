@@ -375,7 +375,7 @@ export default {
 					newPosition = 0;
 				}
 
-				this.moveComponents([item.component.guid], newPosition, newParent.guid);
+				this.moveComponents([item.component.guid], newPosition, item.newParentGuid);
 			}
 		},
 
@@ -389,10 +389,12 @@ export default {
 				case "ML": typeLong = "Milestone"; break;
 			}
 
+			const newParentGuid = newParent ? newParent.guid : "00000000-0000-0000-0000-000000000000";
+
 			const newComponent = { 
 				type, 
 				typeLong,
-				parentGuid: newParent.guid,
+				parentGuid: newParentGuid,
 				guid: undefined,
 				children: [],
 				code: "New " + typeLong,
@@ -555,7 +557,7 @@ export default {
 				updateComponent.description = component.description;
 				updateComponent.roadmapGuid = this.roadmap.guid;
 				updateComponent.guid = component.guid;
-				updateComponent.parentGuid =component.parentGuid;
+				updateComponent.parentGuid = component.parentGuid;
 			} else {
 				updateComponent = component;
 				updateComponent.roadmapGuid = this.roadmap.guid;

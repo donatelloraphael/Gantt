@@ -52,16 +52,18 @@
 		<!-- Edit Panel -->
 
 		<div class="edit-panel" v-if="editorShown">
-			<p v-if="errors.length">
-		    <b>Please correct the following error(s):</b>
-		    <ul>
-		      <li v-for="error in errors">{{ error }}</li>
-		    </ul>
-		  </p>
 
 			<div class="edit-name">
 				<h2>{{ currentComponent.code }}</h2>
 			</div>
+
+			<p v-if="errors.length">
+		    <b>Please correct the following error(s):</b>
+		    <ul class="errors">
+		      <li v-for="error in errors">{{ error }}</li>
+		    </ul>
+		  </p>
+
 			<div class="edit-body">
 				<label for="name-edit">Name: </label>
 				<input type="text" name="name-edit" id="name-edit" v-model="currentComponent.code">
@@ -414,6 +416,7 @@ export default {
 			newComponent.guid = createdComponentGuid;
 			this.currentComponent = Object.create(newComponent);
 			this.editorShown = true;
+			this.errors = [];
 
 			this.getRoadmap(this.roadmap.guid);
 
@@ -478,6 +481,7 @@ export default {
 				this.checkedChanged++;
 				this.currentComponent = Object.create(item.component);
 				this.editorShown = true;
+				this.errors = [];
 
 			} else {
 				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
@@ -486,6 +490,7 @@ export default {
 						this.checkedChanged++;
 						this.currentComponent = { code: "Edit" };
 						this.editorShown = false;
+						this.errors = [];
 						return;
 					}
 				}
@@ -510,7 +515,36 @@ export default {
 
 		// Validates the edit panel input and saves it.
 		validateAndSave() {
+			this.errors = [];
 
+			if (!this.currentComponent.code) {
+				this.errors.push("A name is required.");
+			}
+			if (this.currentComponent.estDays < 0 || this.currentComponent.estHours < 0 || this.currentComponent.estMinutes < 0) {
+				this.errors.push("Invalid estimated duration.");
+			}
+			if (this.currentComponent.progress < 0 || this.currentComponent.progress > 100) {
+				this.errors.push("Invalid progress value.");
+			}
+
+			if (!this.errors.length) {
+				this.updateComponent(this.currentComponent);
+			}
+		},
+
+		updateComponent(component) {
+			const updatedComponent = this.transformComponentForSaving(component);
+		},
+
+		transformComponentForSaving(component) {
+			let hours = 0, minutes = 0, seconds = 0;
+
+			const [year, month, date]  = component.startDate.split("-");
+			[hours, minutes, seconds] = component.startTime.split(":");
+
+			console.log(year, month, date);
+			const newDate = new Date(year, month - 1, date, hours, minutes, seconds);
+			console.log(newDate.getTime());
 		}
 	},
 
@@ -842,7 +876,7 @@ label.estimated-duration {
 	display: block;
 }
 .edit-body input.estimated-duration {
-	width: 70px;
+	width: 60px;
 	margin-right: 5px;
 	height: 20px;
 }
@@ -868,6 +902,9 @@ label.estimated-duration {
 	background-color: #141414;
 }
 
+.errors li {
+	color: red;
+}
 /*************************Dialogs************************/
 
 .backdrop {

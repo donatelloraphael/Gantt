@@ -533,18 +533,52 @@ export default {
 		},
 
 		updateComponent(component) {
-			const updatedComponent = this.transformComponentForSaving(component);
+			let typeLong;
+
+			switch(component.type) {
+				case "PH": typeLong = "Phase"; break;
+				case "SE": typeLong = "Section"; break;
+				case "AC": typeLong = "Action"; break;
+				case "ML": typeLong = "Milestone"; break;
+			}
+
+			if (component.type === "AC") {
+				component = this.transformComponentForSaving(component);
+			}
+
+			console.log(component);
+
+			let updateComponent = {};
+			if (component.type === "PH" || component.type === "SE" || component.type === "ML") {
+				updateComponent.code = component.code;
+				updateComponent.description = component.description;
+				updateComponent.roadmapGuid = this.roadmap.guid;
+				updateComponent.guid = component.guid;
+				updateComponent.parentGuid =component.parentGuid;
+			} else {
+				updateComponent = component;
+				updateComponent.roadmapGuid = this.roadmap.guid;
+			}
+
+			this.$axios.put(`/api/roadmaps/${this.roadmap.guid}/${typeLong}s/${component.guid}`, updateComponent)
+			.then(() => this.getRoadmap(this.roadmap.guid))
+			.catch(err => console.log(err));
 		},
 
 		transformComponentForSaving(component) {
+			const NUM_MINUTES_IN_DAY = 1440;
+
 			let hours = 0, minutes = 0, seconds = 0;
 
 			const [year, month, date]  = component.startDate.split("-");
 			[hours, minutes, seconds] = component.startTime.split(":");
 
-			console.log(year, month, date);
 			const newDate = new Date(year, month - 1, date, hours, minutes, seconds);
-			console.log(newDate.getTime());
+
+			component.startDateTime = newDate.getTime();
+			component.estimatedDuration = component.estDays * NUM_MINUTES_IN_DAY + component.estHours * 60 + component.estMinutes;
+
+			return component;
 		}
 	},
 

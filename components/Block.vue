@@ -15,9 +15,14 @@
 
 <script>
 
+const PROGRESS_TEST = true;
+
 	export default {
 	  name: "Block",
-	  props: ["block", "component"],
+	  props: {
+	  	block: Object,
+	  	component: Object,
+	  },
 	  data() {
 	  	return {
 	  		sign: "–",
@@ -26,6 +31,7 @@
 	  	}
 	  },
 	  computed: {
+	  	// Trim block name if it is too long
 	  	blockName() {
 				return this.block.code.length > 17 ? this.block.code.substr(0, 17) + "..." : this.block.code;
 			},
@@ -48,10 +54,6 @@
 
 	    log() {
 	    	console.log(this.block);
-	    },
-
-	    emitComponent() {
-	    	$nuxt.$emit("componentcheck", { checked: this.isChecked, component: this.block });
 	    },
 
 	    startDrag(e) {
@@ -128,6 +130,30 @@
 	    	$nuxt.$emit("triggerdrop", item);
 	    },
 	  },
+
+	  mounted() {
+	  	let estimatedProgress = 0;
+			let actualProgress = this.progress;
+			let estimatedDuration = this.estimatedDuration * 60 * 1000;
+
+	  	if (this.children && this.children.length === 0 && this.type === "AC") {
+
+	  		setInterval(() => {
+		  		let timeElapsed = Date.now() - this.startDateTime;
+		  		if (timeElapsed >= estimatedDuration) {
+		  			estimatedProgress = 100;
+		  		} else {
+		  			estimatedProgress = timeElapsed / estimatedDuration * 100;
+		  		}
+
+		  		// Test data for progress visualization
+		  		if (PROGRESS_TEST) {
+		  			actualProgress = estimatedProgress - 10;
+		  		}
+		  	});
+	  	}
+	  	
+	  }
 	};
 
 </script>

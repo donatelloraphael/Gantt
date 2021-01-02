@@ -44,7 +44,7 @@
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 
 				<ul class="blocks">
-				  <Block :block="components" :component="currentComponent" :key="refreshGraph" @componentCheck="populateChecked"></Block>
+				  <Block :block="components" :component="currentComponent" :key="refreshGraph"></Block>
 				</ul>
 			</div>
 		</div>
@@ -84,16 +84,16 @@
 
 				<div v-if="currentComponent.type === 'AC'">
 					<label for="date-edit">Start Date and Time: </label>
-					<input type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
-					<input type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
+					<input disabled type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
+					<input disabled type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
 
 					<label for="estimated-days" class="estimated-duration">Estimated Duration: </label>
-					<input type="number" name="estimated-days" class="estimated-duration" placeholder="Days" min="0" v-model="currentComponent.estDays">
-					<input type="number" name="estimated-hours" class="estimated-duration" placeholder="Hours" min="0" v-model="currentComponent.estHours">
-					<input type="number" name="estimated-minutes" class="estimated-duration" placeholder="Minutes" min="0" v-model="currentComponent.estMinutes">
+					<input disabled type="number" name="estimated-days" class="estimated-duration" placeholder="Days" min="0" v-model="currentComponent.estDays">
+					<input disabled type="number" name="estimated-hours" class="estimated-duration" placeholder="Hours" min="0" v-model="currentComponent.estHours">
+					<input disabled type="number" name="estimated-minutes" class="estimated-duration" placeholder="Minutes" min="0" v-model="currentComponent.estMinutes">
 
 					<label for="progress">Progress: </label>
-					<input type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
+					<input disabled type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
 				</div>
 
 				<button id="save" @click="validateAndSave()">Save</button>
@@ -124,7 +124,10 @@
 </template>
 
 <script>
+import Vue from "vue";
 import Block from "./Block";
+
+const PROGRESS_TEST = true;
 
 export default {
 	name: "Chart",
@@ -145,6 +148,7 @@ export default {
 			errors: [],
 			parallelizeAvailable: false,
 			checkedChanged: 0,
+			componentLengthFactor: 1,
 		};
 	},
 	components: {
@@ -153,7 +157,12 @@ export default {
 	watch: {
 		// Transform roadmap components in to a recursive-able form
 		roadmapChanged() {
+			if (PROGRESS_TEST) {
+				this.setTestData(this.roadmap.components);
+			}
 			this.components = this.transformComponents(this.roadmap.components);
+			this.components.children = this.handleProgress(this.components.children);
+
 			this.refreshGraph++;
 		},
 
@@ -195,7 +204,7 @@ export default {
 					components: []
 				};
 				this.roadmaps.push(newRoadmap);
-
+				this.getRoadmap(newRoadmap.guid);
 				// Clears state
 				this.createRoadmapDialog = false;
 				this.roadmapTitle = "";
@@ -251,8 +260,14 @@ export default {
 			transformedComponents.children = sortByPosition(transformedComponents.children);
 
 			// Iterates and calls populateChildren function on top-level components
+			let indentationLevel; // Descending order
 			for (let i = 0; i < transformedComponents.children.length; i++) {
 				transformedComponents.children[i].expanded = true;
+				indentationLevel = 0;
+				if (!transformedComponents.children[i].children.length) {
+					indentationLevel = -1; // Need -1 to get 0 in components that have no children
+				}
+				// transformedComponents.children[i].indentationLevel = indentationLevel;
 				populateChildren(transformedComponents.children[i]);
 			}
 
@@ -262,14 +277,21 @@ export default {
 					for (let j = 0, n = components.length; j < n; j++) {
 						// Match object in components and replace the guid with it
 						if (components[j].guid === component.children[i]) {
-							component.children[i] = components[j];
+
+							component.children[i] = components[j]; // Replace guid with object
+
 							if (component.children[i].children.length > 0) {
 								component.children[i].expanded = true;
 								populateChildren(component.children[i]);
+								component.children[i].indentationLevel = ++indentationLevel;
+							} else {
+								if (indentationLevel > 0) indentationLevel--; // Need this to prevent off by 1 error
+								component.children[i].indentationLevel = indentationLevel;
 							}
 						}
 					}
 				}
+				component.indentationLevel = indentationLevel + 1;
 				component.children = sortByPosition(component.children);
 			}
 
@@ -533,6 +555,7 @@ export default {
 			if (!this.errors.length) {
 				this.updateComponent(this.currentComponent);
 			}
+			this.editorShown = false;
 		},
 
 		updateComponent(component) {
@@ -549,8 +572,6 @@ export default {
 				component = this.transformComponentForSaving(component);
 			}
 
-			console.log(component);
-
 			let updateComponent = {};
 			if (component.type === "PH" || component.type === "SE" || component.type === "ML") {
 				updateComponent.code = component.code;
@@ -562,6 +583,8 @@ export default {
 				updateComponent = component;
 				updateComponent.roadmapGuid = this.roadmap.guid;
 			}
+
+			console.log(updateComponent);
 
 			this.$axios.$put(`/api/roadmaps/${this.roadmap.guid}/${typeLong}s/${component.guid}`, updateComponent)
 			.then(() => this.getRoadmap(this.roadmap.guid))
@@ -594,6 +617,102 @@ export default {
 
 			component.progress = parseInt(component.progress);
 			return component;
+		},
+
+		// Set mock data for progress demo ////////////////////////////////
+		setTestData(components) {
+
+			for (let i = 0, length = components.length; i < length; i++) {
+				if (components[i].type === "AC" && PROGRESS_TEST) {
+					components[i].startDateTime = Date.now();
+					components[i].estimatedDuration = (Math.ceil(Math.random() * 5)) + 1;
+					components[i].progress = 0;
+				}
+			}
+		},
+
+		handleProgress(components) {
+			for (let i = 0, length = components.length; i < length; i++) {
+
+				components[i].calculatedProgress = 0;
+				components[i].progress = 0;
+
+				let calculatedProgress = 0, actualProgress = 0;
+
+				[ calculatedProgress, actualProgress ] = refreshProgress(components[i]);
+
+				let numChildren = components[i].children ? components[i].children.length : 1;
+
+				components[i].calculatedProgress = calculatedProgress / numChildren;
+				components[i].progress = actualProgress / numChildren;
+			}
+
+			function refreshProgress(component) {
+
+				let numChildren;
+				let calculatedSum = 0, actualSum = 0;
+				if (component.children && component.children.length) {
+					for (let i = 0, length = component.children.length; i < length; i++) {
+						let [ calculatedProgress, actualProgress ] = refreshProgress(component.children[i]);
+						numChildren = component.children ? component.children.length : 1;
+
+						calculatedSum += calculatedProgress;
+						actualSum += actualProgress;
+
+						let actionCalculatedProgress = 0;
+						let actionActualProgress = component.progress || 0;
+
+						if (component.type === "AC") {
+							
+							let estimatedDuration = component.estimatedDuration * 60 * 1000;
+
+							let timeElapsed = Date.now() - component.startDateTime;
+
+				  		if (timeElapsed >= estimatedDuration) {
+				  			actionCalculatedProgress = 100;
+				  		} else {
+				  			actionCalculatedProgress = Math.round(timeElapsed / estimatedDuration * 100);
+				  		}
+
+				  		// Test data for progress visualization
+				  		if (PROGRESS_TEST) {
+				  			actionActualProgress = Math.round(actionCalculatedProgress / 2);
+				  		}
+
+							numChildren++;
+							calculatedSum += actionCalculatedProgress;
+							actualSum += actionActualProgress;
+						}						
+					}
+					component.calculatedProgress = calculatedSum / numChildren;
+					component.progress = actualSum / numChildren;
+				} 
+
+				if (component.type === "AC") {
+
+					let calculatedProgress = 0;
+					let actualProgress = component.progress || 0;
+					let estimatedDuration = component.estimatedDuration * 60 * 1000;
+
+					let timeElapsed = Date.now() - component.startDateTime;
+
+		  		if (timeElapsed >= estimatedDuration) {
+		  			calculatedProgress = 100;
+		  		} else {
+		  			calculatedProgress = Math.round(timeElapsed / estimatedDuration * 100);
+		  		}
+
+		  		// Test data for progress visualization
+		  		if (PROGRESS_TEST) {
+		  			actualProgress = Math.round(calculatedProgress / 2);
+		  		}
+
+					component.calculatedProgress = calculatedProgress;
+					component.progress = actualProgress;
+				}
+				return [component.calculatedProgress, component.progress];
+			}
+			return components;
 		}
 	},
 
@@ -611,9 +730,15 @@ export default {
     this.$nuxt.$on("componentcheck", item => {
     	this.populateChecked(item);
     });
+
+    let progressInterval = setInterval(() => {
+    	this.components.children = this.handleProgress(this.components.children);
+    }, 5000);
 	},
 
 	beforeDestroy() {
+		// clearInterval(progressInterval);
+
     this.$nuxt.$off("triggerdrop");
     this.$nuxt.$off("componentcheck");
   },

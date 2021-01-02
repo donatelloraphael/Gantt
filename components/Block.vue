@@ -1,37 +1,56 @@
 <template>
   <li class="block">
-  	<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code" v-model="isChecked" @change="emitComponent()">
-  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
-  	<span v-if="!block.children.length && block.code" class="placeholder"></span>
-    <span class="block" :class="[type]" @click="expand(); toggleSign();" v-if="block.guid" draggable
-        @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragover.prevent @dragenter.prevent>{{ blockName }}</span>
-    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#88FF88';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
+  	<div class="block-container">
+  		<input type="checkbox" :value="JSON.stringify(block)" v-if="block.code" v-model="isChecked" @change="emitComponent()">
+	  	<span v-if="!block.children.length && block.code" class="placeholder"></span>
+	  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
+
+	    <span class="block" :class="[type, dragOver]" @click="expand(); toggleSign();" v-if="block.guid" draggable
+	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver='highlight'" @dragleave="dragOver=false" :style="{'background-color': `${calcColor}`}">{{ blockName }}</span>
+  	</div>
+  	
+
+    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#f2e721';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
-      <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index"></block>
+      <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue"></block>
     </ul>
   </li>
 </template>
 
 <script>
 
-const PROGRESS_TEST = true;
-
 	export default {
 	  name: "Block",
 	  props: {
 	  	block: Object,
 	  	component: Object,
+	  	achue: Number,
+	  	sehue: Number,
+	  	phhue: Number,
+	  	mlhue: Number,
 	  },
 	  data() {
 	  	return {
 	  		sign: "–",
 	  		type: this.block.type,
 	  		isChecked: this.block.guid === this.component.guid,
+	  		dragOver: false,
+	  		acHue: this.achue - 10,
+	  		seHue: this.sehue - 10,
+	  		phHue: this.phhue - 10,
+	  		mlHue: this.mlhue - 10,
 	  	}
 	  },
 	  computed: {
-	  	// Trim block name if it is too long
+	  	calcColor() {
+	  		switch(this.block.type) {
+	  			case "AC": return `hsl(${this.acHue}, 53%, 58%)`; break;
+	  			case "SE": return `hsl(${this.seHue}, 53%, 58%)`; break;
+	  			case "PH": return `hsl(${this.phHue}, 53%, 58%)`; break;
+	  			case "ML": return `hsl(${this.mlHue}, 53%, 58%)`; break;
+	  		}
+	  	},
 	  	blockName() {
 				return this.block.code.length > 17 ? this.block.code.substr(0, 17) + "..." : this.block.code;
 			},
@@ -54,6 +73,10 @@ const PROGRESS_TEST = true;
 
 	    log() {
 	    	console.log(this.block);
+	    },
+
+	    emitComponent() {
+	    	$nuxt.$emit("componentcheck", { checked: this.isChecked, component: this.block });
 	    },
 
 	    startDrag(e) {
@@ -130,42 +153,24 @@ const PROGRESS_TEST = true;
 	    	$nuxt.$emit("triggerdrop", item);
 	    },
 	  },
-
-	  mounted() {
-	  	let estimatedProgress = 0;
-			let actualProgress = this.progress;
-			let estimatedDuration = this.estimatedDuration * 60 * 1000;
-
-	  	if (this.children && this.children.length === 0 && this.type === "AC") {
-
-	  		setInterval(() => {
-		  		let timeElapsed = Date.now() - this.startDateTime;
-		  		if (timeElapsed >= estimatedDuration) {
-		  			estimatedProgress = 100;
-		  		} else {
-		  			estimatedProgress = timeElapsed / estimatedDuration * 100;
-		  		}
-
-		  		// Test data for progress visualization
-		  		if (PROGRESS_TEST) {
-		  			actualProgress = estimatedProgress - 10;
-		  		}
-		  	});
-	  	}
-	  	
-	  }
 	};
 
 </script>
 
 <style scoped>
-	
-	li {
+	.block-container {
+		width: 100%;
+		margin: 0;
+		padding: 0;
+	}
+	li .block-container {
 	  padding: 0 0 0 1rem;
+	  position: relative;
+	  left: -10px;
 	  /*border-left: 1px solid #d3d3d3;*/
 	}
 
-	li > span.block {
+	li .block-container > span.block {
 	  padding: 0.2rem 0.5rem;
 	  border: 1px solid #d3d3d3;
 	  cursor: pointer;
@@ -174,14 +179,14 @@ const PROGRESS_TEST = true;
 	  bottom: 4px;
 	  width: 150px;
 	  z-index: 200;
-	  border-radius: 20px;
+	  border-radius: 10px;
 	}
 
 	ul.sub-blocks {
 	  padding: 0;
 	  margin: 0 0 0 10px;
 	  box-sizing: border-box;
-	  width: 100%;
+	  width: 80%;
 	  list-style: none;
 	  border: none;
 	}
@@ -190,7 +195,7 @@ const PROGRESS_TEST = true;
 		width: 10px;
 		display: inline-block;
 		border: none;
-	  padding: 0 0 0 0rem;
+	  padding: 0;
 	  position: relative;
 	  bottom: 6px;
 	}
@@ -201,37 +206,25 @@ const PROGRESS_TEST = true;
 	}
 
 	li input {
-		position: absolute;
-		left: 0;
+		position: relative;
+		bottom: 4px;
 	}
 
 	.drop-zone {
-		width: 70vw;
-		height: 15px;
-		/*background-color: yellow;*/
+		width: 100vw;
+		height: 8px;
 		position: relative;
+		left: -100px;
 		bottom: 4px;
 		z-index: 200;
+		border-radius: 10px;
 	}
 
-	.PH {
-		background-color: #433d3c;
+	.PH, .SE, .AC, .ML {
 		color: white;
 	}
 
-	.SE {
-		background-color: #9f5f80;
-		color: white;
+	.highlight {
+		border: 2px solid #f2e721 !important;
 	}
-
-	.AC {
-		background-color: #045762;
-		color: white;
-	}
-
-	.ML {
-		background-color: #682c0e;
-		color: white;
-	}
-
 </style>

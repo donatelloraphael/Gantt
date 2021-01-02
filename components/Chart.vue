@@ -44,7 +44,7 @@
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 
 				<ul class="blocks">
-				  <Block :block="components" :component="currentComponent" :key="refreshGraph"></Block>
+				  <Block :block="components" :component="currentComponent" :key="refreshGraph" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue"></Block>
 				</ul>
 			</div>
 		</div>
@@ -149,6 +149,10 @@ export default {
 			parallelizeAvailable: false,
 			checkedChanged: 0,
 			componentLengthFactor: 1,
+			acHue: 258,
+			seHue: 39,
+			phHue: 199,
+			mlHue: 100,
 		};
 	},
 	components: {
@@ -455,6 +459,7 @@ export default {
 			// 	};
 
 			// 	this.$axios.$put(`/api/roadmaps/${this.roadmap.guid}/Actions/${newParent.guid}`, parentComponent)
+			// 	.then((response) => console.log(response))
 			// 	.catch(err => console.log(err));
 			// }
 		},
@@ -728,6 +733,7 @@ export default {
     });
 
     this.$nuxt.$on("componentcheck", item => {
+    	console.log("CHECKED", this.checkedComponents);
     	this.populateChecked(item);
     });
 
@@ -788,7 +794,7 @@ export default {
 	height: 40px;
 	outline: none;
 	border: none;
-	background-color: #944e6c;
+	background-color: #d15788;
 	font-size: 1rem;
 	cursor: pointer;
 	display: inline-block;
@@ -806,7 +812,7 @@ export default {
 	height: 40px;
 	font-size: 1rem;
 	border: none;
-	background-color: #cc7351;
+	background-color: #e57952;
 	color: white;
 	outline: none;
 	padding-left: 10px;
@@ -821,7 +827,7 @@ export default {
 }
 
 #button-parallelize {
-	background-color: #6155a6;
+	background-color: #8c91ff;
 	width: 200px;
 	color: white;
 	cursor: pointer;
@@ -835,19 +841,19 @@ export default {
 
 .menu .toggle {
 	background-color: white;
-	border: 2px #7c425a solid;
-	color: #7c425a;
+	border: 2px #1082ed solid;
+	color: #1082ed;
 	font-size: 1rem;
 	grid-column: span 1;
 	width: 200px;
 }
 
 .menu .toggle:hover {
-	background-color: #eddce3;
+	background-color: #b6d7ea;
 }
 
 .menu .toggle.active {
-	background-color: black;
+	background-color: #1082ed;
 	color: white;
 }
 
@@ -879,23 +885,23 @@ export default {
 
 .operations .phase {
 	margin-top: 50px;
-	border: 2px solid #433d3c;
-	color: #433d3c;
+	border: 2px solid hsl(199, 53%, 58%);
+	color: hsl(199, 53%, 58%);
 }
 
 .operations .section {
-	border: 2px solid #9f5f80;
-	color: #9f5f80;
+	border: 2px solid hsl(39, 53%, 58%);
+	color: hsl(39, 53%, 58%);
 }
 
 .operations .task {
-	border: 2px solid #045762;
-	color: #045762;
+	border: 2px solid hsl(258, 53%, 58%);
+	color: hsl(258, 53%, 58%);
 }
 
 .operations .milestone {
-	border: 2px solid #682c0e;
-	color: #682c0e;
+	border: 2px solid hsl(100, 53%, 58%);
+	color: hsl(100, 53%, 58%);
 }
 
 /************************Components**********************/
@@ -912,19 +918,23 @@ export default {
 }
 
 .components .heading {
-	width: 70rem;
-	background-color: #70af85;
+	width: 120vw;
+	background-color: #85d39f;
 	text-align: left;
 	padding: 10px 0 10px 15px;
 	color: white;
 	display: flex;
-	justify-content: space-between;
 	align-items: center;
 }
 
 .components h2 {
 	font-size: 1.4rem;
 	margin: 0 10px 10px 10px;
+}
+
+.duration h2 {
+	position: relative;
+	margin-left: 500px;
 }
 
 .components h3 {
@@ -994,7 +1004,7 @@ ul.blocks {
 .edit-name {
 	font-size: 1rem;
 	padding: 13px 0 14px 15px;
-	background-color: black;
+	background-color: #1082ed;
 	color: white;
 }
 
@@ -1066,7 +1076,7 @@ label.estimated-duration {
 	width: 100%;
 	border-radius: 10px;
 	margin-top: 20px;
-	background-color: black;
+	background-color: #1082ed;
 	color: white;
 	height: 40px;
 	font-size: 1.2rem;

@@ -9,8 +9,6 @@
 				<option value="">Select a roadmap</option>
 				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
-			<!-- <button class="roadmap positive">Save Roadmap</button> -->
-			<!-- <button class="roadmap negative">Delete Roadmap</button> -->
 			<button id="button-parallelize" :disabled="!parallelizeAvailable" @click="parallelize()">Parallelize</button>
 			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Edit</button>
 		</div>
@@ -37,7 +35,7 @@
 					<h3>{{ roadmap.description }}</h3>
 				</div>
 				<div class="duration">
-					<h2>15m / 30m</h2>
+					<h2>{{ Math.round(averageProgress) }}% Complete</h2>
 				</div>
 			</div>
 
@@ -149,6 +147,7 @@ export default {
 			parallelizeAvailable: false,
 			checkedChanged: 0,
 			componentLengthFactor: 1,
+			averageProgress: 0,
 			acHue: 258,
 			seHue: 39,
 			phHue: 199,
@@ -637,6 +636,9 @@ export default {
 		},
 
 		handleProgress(components) {
+			let cumulativeProgress = 0;
+			let numOfComponents = 0;
+
 			for (let i = 0, length = components.length; i < length; i++) {
 
 				components[i].calculatedProgress = 0;
@@ -647,10 +649,21 @@ export default {
 				[ calculatedProgress, actualProgress ] = refreshProgress(components[i]);
 
 				let numChildren = components[i].children ? components[i].children.length : 1;
+				if (numChildren === 0) {
+					numChildren = 1;
+				}
 
 				components[i].calculatedProgress = calculatedProgress / numChildren;
 				components[i].progress = actualProgress / numChildren;
+				cumulativeProgress += components[i].calculatedProgress;
+				if(components[i].calculatedProgress) {
+					numOfComponents++;
+				}
 			}
+			if (numOfComponents === 0) {
+				numOfComponents = 1;
+			}
+			this.averageProgress = cumulativeProgress / numOfComponents;
 
 			function refreshProgress(component) {
 
@@ -660,6 +673,9 @@ export default {
 					for (let i = 0, length = component.children.length; i < length; i++) {
 						let [ calculatedProgress, actualProgress ] = refreshProgress(component.children[i]);
 						numChildren = component.children ? component.children.length : 1;
+						if (numChildren === 0) {
+							numChildren = 1;
+						}
 
 						calculatedSum += calculatedProgress;
 						actualSum += actualProgress;
@@ -689,11 +705,10 @@ export default {
 							actualSum += actionActualProgress;
 						}						
 					}
-					component.calculatedProgress = calculatedSum / numChildren;
-					component.progress = actualSum / numChildren;
-				} 
+					component.calculatedProgress = Math.round(calculatedSum / numChildren);
+					component.progress = Math.round(actualSum / numChildren);
 
-				if (component.type === "AC") {
+				} else if (component.type === "AC") {
 
 					let calculatedProgress = 0;
 					let actualProgress = component.progress || 0;
@@ -739,7 +754,7 @@ export default {
 
     let progressInterval = setInterval(() => {
     	this.components.children = this.handleProgress(this.components.children);
-    }, 5000);
+    }, 500);
 	},
 
 	beforeDestroy() {
@@ -764,7 +779,7 @@ export default {
   align-items: center;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   grid-template-rows: 100px 600px;
-  grid-gap: 1rem;
+  grid-gap: 1rem 0.5rem;
   grid-auto-flow: column dense;
 }
 
@@ -919,7 +934,7 @@ export default {
 
 .components .heading {
 	width: 120vw;
-	background-color: #85d39f;
+	background-color: #ffa600;
 	text-align: left;
 	padding: 10px 0 10px 15px;
 	color: white;
@@ -934,7 +949,7 @@ export default {
 
 .duration h2 {
 	position: relative;
-	margin-left: 500px;
+	margin-left: 450px;
 }
 
 .components h3 {
@@ -1083,7 +1098,7 @@ label.estimated-duration {
 }
 
 #save:hover {
-	background-color: #141414;
+	background-color: #1068ba;
 }
 
 .errors li {

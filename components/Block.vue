@@ -6,7 +6,10 @@
 	  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
 
 	    <span class="block" :class="[type, dragOver]" @click="expand(); toggleSign();" v-if="block.guid" draggable
-	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver='highlight'" @dragleave="dragOver=false" :style="{'background-color': `${calcColor}`}">{{ blockName }}</span>
+	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver='highlight'" @dragleave="dragOver=false" :style="{'background-color': `${calcColor}`, width: `${blockWidth}px`}" :key="blockWidth">{{ this.block.code }}
+	  		<span class="progress">{{ calculatedProgress }}%</span>
+			</span>
+	    
   	</div>
   	
 
@@ -40,6 +43,7 @@
 	  		seHue: this.sehue - 10,
 	  		phHue: this.phhue - 10,
 	  		mlHue: this.mlhue - 10,
+	  		// blockWidth: 
 	  	}
 	  },
 	  computed: {
@@ -51,12 +55,15 @@
 	  			case "ML": return `hsl(${this.mlHue}, 53%, 58%)`; break;
 	  		}
 	  	},
-	  	blockName() {
-				return this.block.code.length > 17 ? this.block.code.substr(0, 17) + "..." : this.block.code;
-			},
 			currentComponent() {
 				return this.component;
 			},
+			blockWidth() {
+				return (this.block.calculatedProgress * 600 / 100) + 120 + (this.block.indentationLevel * 20);
+			},
+			calculatedProgress() {
+				return this.block.calculatedProgress;
+			}
 	  },
 	  methods: {
 	    expand() {
@@ -153,6 +160,9 @@
 	    	$nuxt.$emit("triggerdrop", item);
 	    },
 	  },
+	  mounted() {
+	  	// setInterval(handler: any, timeout?: long, arguments...: any)
+	  }
 	};
 
 </script>
@@ -163,8 +173,10 @@
 		margin: 0;
 		padding: 0;
 	}
+
 	li .block-container {
-	  padding: 0 0 0 1rem;
+	  padding: 0 0 0 0.5rem;
+	  margin-bottom: 0;
 	  position: relative;
 	  left: -10px;
 	  /*border-left: 1px solid #d3d3d3;*/
@@ -172,19 +184,23 @@
 
 	li .block-container > span.block {
 	  padding: 0.2rem 0.5rem;
+	  margin-left: 20px;
 	  border: 1px solid #d3d3d3;
 	  cursor: pointer;
-	  display:inline-block;
+	  display:flex;
 	  position: relative;
 	  bottom: 4px;
-	  width: 150px;
+	  width: 120px;
 	  z-index: 200;
+	  height: 20px;
 	  border-radius: 10px;
+	  overflow: hidden;
+	  justify-content: space-between;
 	}
 
 	ul.sub-blocks {
 	  padding: 0;
-	  margin: 0 0 0 10px;
+	  margin: 0 0 0 20px;
 	  box-sizing: border-box;
 	  width: 80%;
 	  list-style: none;
@@ -196,8 +212,9 @@
 		display: inline-block;
 		border: none;
 	  padding: 0;
-	  position: relative;
-	  bottom: 6px;
+	  position: absolute;
+	  bottom: 11px;
+	  left: -5px;
 	}
 
 	.sign {
@@ -206,8 +223,12 @@
 	}
 
 	li input {
-		position: relative;
-		bottom: 4px;
+		position: absolute;
+		bottom: 9px;
+	}
+
+	.progress {
+		color: white;
 	}
 
 	.drop-zone {

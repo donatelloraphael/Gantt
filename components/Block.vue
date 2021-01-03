@@ -5,23 +5,23 @@
 	  	<span v-if="!block.children.length && block.code" class="placeholder"></span>
 	  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
 
-	    <span class="block" :class="[type, dragOver]" @click="expand(); toggleSign();" v-if="block.guid" draggable
-	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver='highlight'" @dragleave="dragOver=false" :style="{'background-color': `${calcColor}`, width: `${blockWidth}px`}" :key="blockWidth">{{ this.block.code }}
+	    <span class="block" :class="{ 'highlight-selected': currentComponentSelected, highlight: dragOver, parallelized: block.parallelized }" @click="emitSelected()" v-if="block.guid" draggable
+	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver=true" @dragleave="dragOver=false" @mouseleave="dragOver=false":style="{'background-color': `${calcColor}`, width: `${blockWidth}px`}" :key="blockWidth">{{ this.block.code }}
 	  		<span class="progress">{{ calculatedProgress }}%</span>
 			</span>
-	    
+
   	</div>
   	
-
-    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#f2e721';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
+    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
-      <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue"></block>
+      <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue" :selectedguid="selectedguid"></block>
     </ul>
   </li>
 </template>
 
 <script>
+import Alea from "alea";
 
 	export default {
 	  name: "Block",
@@ -32,6 +32,7 @@
 	  	sehue: Number,
 	  	phhue: Number,
 	  	mlhue: Number,
+	  	'selectedguid': String,
 	  },
 	  data() {
 	  	return {
@@ -43,27 +44,38 @@
 	  		seHue: this.sehue - 10,
 	  		phHue: this.phhue - 10,
 	  		mlHue: this.mlhue - 10,
-	  		// blockWidth: 
-	  	}
+	  	};
 	  },
 	  computed: {
 	  	calcColor() {
-	  		switch(this.block.type) {
-	  			case "AC": return `hsl(${this.acHue}, 53%, 58%)`; break;
-	  			case "SE": return `hsl(${this.seHue}, 53%, 58%)`; break;
-	  			case "PH": return `hsl(${this.phHue}, 53%, 58%)`; break;
-	  			case "ML": return `hsl(${this.mlHue}, 53%, 58%)`; break;
+	  		if (this.block.parallelized) {
+	  			const prng = new Alea(this.block.position);
+	  			let randomNum = (Math.floor((prng() * 10) * (prng() * 10)));
+
+	  			return `hsl(${this.seHue - randomNum}, 53%, 58%)`;
+
+	  		} else {
+	  			switch(this.block.type) {
+		  			case "AC": return `hsl(${this.acHue}, 53%, 58%)`; break;
+		  			case "SE": return `hsl(${this.seHue}, 53%, 58%)`; break;
+		  			case "PH": return `hsl(${this.phHue}, 53%, 58%)`; break;
+		  			case "ML": return `hsl(${this.mlHue}, 53%, 58%)`; break;
+		  		}
 	  		}
+	  		
 	  	},
 			currentComponent() {
 				return this.component;
 			},
 			blockWidth() {
-				return (this.block.calculatedProgress * 600 / 100) + 120 + (this.block.indentationLevel * 20);
+				return (this.block.calculatedProgress * 600 / 100) + 130 + (this.block.indentationLevel * 20);
 			},
 			calculatedProgress() {
-				return this.block.calculatedProgress;
-			}
+				return Math.round(this.block.calculatedProgress);
+			},
+			currentComponentSelected() {
+				return this.block.guid === this.selectedguid;
+			},
 	  },
 	  methods: {
 	    expand() {
@@ -84,6 +96,10 @@
 
 	    emitComponent() {
 	    	$nuxt.$emit("componentcheck", { checked: this.isChecked, component: this.block });
+	    },
+
+	    emitSelected() {
+	    	$nuxt.$emit("componentselected", this.block);
 	    },
 
 	    startDrag(e) {
@@ -134,9 +150,15 @@
 				if (component.guid === newParentGuid) {
 	    		return;
 	    	}
+	    	
+	    	// Prevent modification of order of parallelized sections and components inside it
+				if (this.block.parallelizedPreventChange) {
+	    		return;
+	    	}
 
 	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
 	    	if (eventTargetType === "child") {
+	    		
 	    		if (this.block.type === "SE") {
 		    		if (type === "PH") {
 		    			return;
@@ -156,13 +178,10 @@
 	    		newParentGuid,
 	    		eventTargetType,
 	    		newSibling,
-	    	}
+	    	};
 	    	$nuxt.$emit("triggerdrop", item);
 	    },
 	  },
-	  mounted() {
-	  	// setInterval(handler: any, timeout?: long, arguments...: any)
-	  }
 	};
 
 </script>
@@ -190,12 +209,17 @@
 	  display:flex;
 	  position: relative;
 	  bottom: 4px;
-	  width: 120px;
+	  width: 130px;
 	  z-index: 200;
 	  height: 20px;
 	  border-radius: 10px;
 	  overflow: hidden;
 	  justify-content: space-between;
+	  color: white;
+	}
+
+	li .block-container > span.block:hover {
+		width: auto !important;
 	}
 
 	ul.sub-blocks {
@@ -241,11 +265,16 @@
 		border-radius: 10px;
 	}
 
-	.PH, .SE, .AC, .ML {
-		color: white;
-	}
-
 	.highlight {
 		border: 2px solid #f2e721 !important;
 	}
+
+	.highlight-selected {
+		border: 2px solid #f2e721 !important;
+	}
+
+	.parallelized {
+		font-style: italic;
+	}
+
 </style>

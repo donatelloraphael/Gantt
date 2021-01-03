@@ -10,7 +10,7 @@
 				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
 			<button id="button-parallelize" :disabled="!parallelizeAvailable" @click="parallelize()">Parallelize</button>
-			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown">Edit</button>
+			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown; currentComponent = {}">Toggle Editor</button>
 		</div>
 
 		<!-- Operations -->
@@ -42,7 +42,7 @@
 			<div class="graph-container"  v-if="!componentsPanelDisabled" @drop="onDropEmpty($event)" @dragover.prevent @dragenter.prevent>
 
 				<ul class="blocks">
-				  <Block :block="components" :component="currentComponent" :key="refreshGraph" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue"></Block>
+				  <Block :block="components" :component="currentComponent" :key="refreshGraph" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue" :selectedguid="currentComponent.guid"></Block>
 				</ul>
 			</div>
 		</div>
@@ -94,7 +94,8 @@
 					<input disabled type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
 				</div>
 
-				<button id="save" @click="validateAndSave()">Save</button>
+				<button class="save" @click="validateAndSave()">Save</button>
+				<button class="cancel" @click="editorShown = false; currentComponent={};">Cancel</button>
 
 			</div>
 		</div>
@@ -163,6 +164,7 @@ export default {
 			if (PROGRESS_TEST) {
 				this.setTestData(this.roadmap.components);
 			}
+			this.roadmap.components = this.setParallelized(this.roadmap.components);
 			this.components = this.transformComponents(this.roadmap.components);
 			this.components.children = this.handleProgress(this.components.children);
 
@@ -174,12 +176,12 @@ export default {
 			let length = this.checkedComponents.length;
 
 			if (length > 1) {
-				for (let i = 0; i < length - 1; i++) {
+				for (let i = 0; i < length; i++) {
 					if (this.checkedComponents[i].type !== "SE") {
 						this.parallelizeAvailable = false;
 						return;
 					}
-					if (this.checkedComponents[i].parentGuid !== this.checkedComponents[i+1].parentGuid) {
+					if (i < length - 1 && this.checkedComponents[i].parentGuid !== this.checkedComponents[i+1].parentGuid) {
 						this.parallelizeAvailable = false;
 						return;
 					}
@@ -283,6 +285,11 @@ export default {
 
 							component.children[i] = components[j]; // Replace guid with object
 
+							// Set parallelizedPreventChange flag inside components inside parallelized sections
+							if (component.parallelizedPreventChange) {
+								component.children[i].parallelizedPreventChange = true;
+							}
+
 							if (component.children[i].children.length > 0) {
 								component.children[i].expanded = true;
 								populateChildren(component.children[i]);
@@ -299,11 +306,17 @@ export default {
 			}
 
 			// Sort elements by position value
+			// Duplicate for accessing inside recursive function
 			function sortByPosition(array) {
 				return array.sort((a, b) => a.position - b.position);
 			}
 
 			return transformedComponents;
+		},
+
+		// Sort elements by position value
+		sortByPosition(array) {
+			return array.sort((a, b) => a.position - b.position);
 		},
 
 		// On starting dragging items from operations panel
@@ -381,7 +394,15 @@ export default {
 
 			if (item.isNew) {
 
-				const	position = 0;
+				console.log(item);
+				let	position = 0;
+				if (item.eventTargetType === "sibling") {
+					position = item.newSibling.position + 1;
+
+				} else if (item.eventTargetType === "child") {
+					const childrenInParent = this.findNumItemsInNode(item.newParent);
+					position = item.newParent.position + childrenInParent + 1;
+				}
 
 				this.addNewComponent(item.type, position, newParent, item.eventTargetType);
 
@@ -396,6 +417,7 @@ export default {
 
 				} else if (item.eventTargetType === "sibling") {
 					newPosition = item.newSibling.position + 1;
+					console.log("NEWPPOS", newPosition);
 				} else {
 					newPosition = 0;
 				}
@@ -508,8 +530,6 @@ export default {
 				}
 				this.checkedComponents.push(item.component);
 				this.checkedChanged++;
-				this.currentComponent = Object.create(item.component);
-				this.editorShown = true;
 				this.errors = [];
 
 			} else {
@@ -517,8 +537,6 @@ export default {
 					if (this.checkedComponents[i].guid === item.component.guid) {
 						this.checkedComponents.splice(i, 1);
 						this.checkedChanged++;
-						this.currentComponent = { code: "Edit" };
-						this.editorShown = false;
 						this.errors = [];
 						return;
 					}
@@ -536,10 +554,12 @@ export default {
 			this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/Sections/Parallelize`, {
 				roadmapGuid: this.roadmap.guid,
 				sectionsGuid,
-				ordering: 0,
+				ordering: this.checkedComponents[0].position,
 			}).then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));
 
+			this.parallelizeAvailable = false;
+			this.checkedComponents.length = 0;
 		},
 
 		// Validates the edit panel input and saves it.
@@ -548,6 +568,9 @@ export default {
 
 			if (!this.currentComponent.code) {
 				this.errors.push("A name is required.");
+			}
+			if (!this.currentComponent.description) {
+				this.errors.push("A description is required.");
 			}
 			if (this.currentComponent.estDays < 0 || this.currentComponent.estHours < 0 || this.currentComponent.estMinutes < 0) {
 				this.errors.push("Invalid estimated duration.");
@@ -558,8 +581,9 @@ export default {
 
 			if (!this.errors.length) {
 				this.updateComponent(this.currentComponent);
+				this.editorShown = false;
+				this.currentComponent = {};
 			}
-			this.editorShown = false;
 		},
 
 		updateComponent(component) {
@@ -733,6 +757,26 @@ export default {
 				return [component.calculatedProgress, component.progress];
 			}
 			return components;
+		},
+
+		componentSelected(component) {
+			this.currentComponent = component;
+			this.editorShown = true;
+		},
+
+		setParallelized(components) {
+			const newComponents = this.sortByPosition(components);
+			for (let i = 0, length = newComponents.length; i < length - 1; i++) {
+				if (newComponents[i].position === newComponents[i+1].position) {
+					if (newComponents[i].type === "SE" && newComponents[i+1].type === "SE") {
+						newComponents[i].parallelized = true;
+						newComponents[i].parallelizedPreventChange = true;
+						newComponents[i+1].parallelized = true;
+						newComponents[i+1].parallelizedPreventChange = true;
+					}
+				}
+			}
+			return newComponents;
 		}
 	},
 
@@ -752,6 +796,10 @@ export default {
     	this.populateChecked(item);
     });
 
+    this.$nuxt.$on("componentselected", component => {
+    	this.componentSelected(component);
+    });
+
     let progressInterval = setInterval(() => {
     	this.components.children = this.handleProgress(this.components.children);
     }, 500);
@@ -762,6 +810,7 @@ export default {
 
     this.$nuxt.$off("triggerdrop");
     this.$nuxt.$off("componentcheck");
+    this.$nuxt.$off("componentselected");
   },
 };
 </script>
@@ -1086,19 +1135,28 @@ label.estimated-duration {
 	margin-top: 20px;
 }
 
-#save {
-	display: block;
-	width: 100%;
+button.save, .cancel {
+	display: inline-block;
+	width: 45%;
 	border-radius: 10px;
 	margin-top: 20px;
 	background-color: #1082ed;
 	color: white;
 	height: 40px;
 	font-size: 1.2rem;
+	margin-left: 10px;
 }
 
-#save:hover {
+button.cancel {
+	background-color: #bc6647;
+}
+
+button.save:hover {
 	background-color: #1068ba;
+}
+
+button.cancel:hover {
+	background-color: #9e5238;
 }
 
 .errors li {

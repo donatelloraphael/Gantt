@@ -38,12 +38,12 @@ import Alea from "alea";
 	  	return {
 	  		sign: "–",
 	  		type: this.block.type,
-	  		isChecked: this.block.guid === this.component.guid,
 	  		dragOver: false,
 	  		acHue: this.achue - 10,
 	  		seHue: this.sehue - 10,
 	  		phHue: this.phhue - 10,
 	  		mlHue: this.mlhue - 10,
+	  		isChecked: false,
 	  	};
 	  },
 	  computed: {
@@ -150,11 +150,6 @@ import Alea from "alea";
 				if (component.guid === newParentGuid) {
 	    		return;
 	    	}
-	    	
-	    	// Prevent modification of order of parallelized sections and components inside it
-				if (this.block.parallelizedPreventChange) {
-	    		return;
-	    	}
 
 	    	// Prevent dropping Phases and Sections to Actions and Phases to Sections
 	    	if (eventTargetType === "child") {
@@ -168,7 +163,17 @@ import Alea from "alea";
 		    			return;
 		    		}
 		    	}
-	    	}	    	
+	    	} else if (eventTargetType === "sibling") {
+	    		// Prevent adding components between parallelized sections
+					if (this.block.parallelizedPreventChange) {
+		    		return;
+		    	}
+	    	}
+
+	    	// Prevent moving Parallelized sections
+	    	if (component.parallelized) {
+	    		return;
+	    	}
 
 	    	const item = {
 	    		component,
@@ -259,7 +264,6 @@ import Alea from "alea";
 		width: 100vw;
 		height: 8px;
 		position: relative;
-		left: -100px;
 		bottom: 4px;
 		z-index: 200;
 		border-radius: 10px;
@@ -275,6 +279,7 @@ import Alea from "alea";
 
 	.parallelized {
 		font-style: italic;
+		text-decoration: underline;
 	}
 
 </style>

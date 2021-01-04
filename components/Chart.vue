@@ -4,10 +4,10 @@
 		<!-- Menu -->
 
 		<div class="menu">
-			<button class="roadmap" @click="createRoadmapDialog = true">New Roadmap</button>
+			<button class="roadmap" @click="createRoadmapDialog = true; roadmapTitle = ''; roadmapDescription = '';">New Roadmap</button>
 			<select class="roadmap" name="roadmap-select" id="roadmap-select" @change="getRoadmap($event.target.value)">
-				<option value="">Select a roadmap</option>
-				<option :value="roadmap.guid" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
+				<option value="">{{ roadmapTitle }}</option>
+				<option :value="roadmap.guid" v-if="roadmapTitle !== roadmap.title" v-for="roadmap in roadmaps" :key="roadmap.guid">{{ roadmap.title }}</option>
 			</select>
 			<button id="button-parallelize" :disabled="!parallelizeAvailable" @click="parallelize()">Parallelize</button>
 			<button class="toggle" :class="{ active: editorShown }" @click="editorShown = !editorShown; currentComponent = {}">Toggle Editor</button>
@@ -80,7 +80,7 @@
 					<option value="Error">Error</option>
 				</select>
 
-				<div v-if="currentComponent.type === 'AC'">
+				<!-- <div v-if="currentComponent.type === 'AC'">
 					<label for="date-edit">Start Date and Time: </label>
 					<input disabled type="date" name="date-edit" id="date-edit" v-model="currentComponent.startDate">
 					<input disabled type="time" name="time-edit" id="time-edit" step="2" v-model="currentComponent.startTime">
@@ -92,7 +92,7 @@
 
 					<label for="progress">Progress: </label>
 					<input disabled type="number" min="0" max="100" name="progress" id="progress" v-model="currentComponent.progress">
-				</div>
+				</div> -->
 
 				<button class="save" @click="validateAndSave()">Save</button>
 				<button class="cancel" @click="editorShown = false; currentComponent={};">Cancel</button>
@@ -102,7 +102,7 @@
 
 		<!-- Dialog Boxes -->
 
-		<div class="backdrop roadmapBackdrop" v-if="createRoadmapDialog" @click="createRoadmapDialog = false"></div>
+		<div class="backdrop roadmapBackdrop" v-if="createRoadmapDialog" @click="createRoadmapDialog = false; roadmapTitle='Select a roadmap'; roadmapDescription = '';"></div>
 		<div class="dialog" v-if="createRoadmapDialog">
 			<h2>Create new Roadmap</h2>
 			<div class="name">
@@ -115,7 +115,7 @@
 			</div>
 			<div>
 				<button class="positive" @click="createRoadmap">Create</button>
-				<button class="negative" @click="createRoadmapDialog = false">Cancel</button>
+				<button class="negative" @click="createRoadmapDialog = false; roadmapTitle='Select a roadmap'; roadmapDescription = '';">Cancel</button>
 			</div>
 		</div>
 		
@@ -137,7 +137,7 @@ export default {
 			roadmapChanged: 0,
 			refreshGraph: 0,
 			createRoadmapDialog: false,
-			roadmapTitle: "",
+			roadmapTitle: "Select a roadmap",
 			roadmapDescription: "",
 			editorShown: false,
 			components: { expanded: true, children: [] },
@@ -212,8 +212,8 @@ export default {
 				this.getRoadmap(newRoadmap.guid);
 				// Clears state
 				this.createRoadmapDialog = false;
-				this.roadmapTitle = "";
-				this.roadmapDescription = "";
+				this.roadmapTitle = title;
+				this.roadmapDescription = description;
 			}).catch(err => console.log(err));
 		},
 
@@ -233,6 +233,8 @@ export default {
 			this.$axios.$get(`/api/roadmaps/${guid}`)
 			.then((result) => {
 				this.roadmap = result;
+				this.roadmapTitle = result.title;
+				this.roadmapDescription = result.description;
 				this.roadmapChanged++;
 			}).catch(err => console.log(err));
 		},
@@ -284,11 +286,6 @@ export default {
 						if (components[j].guid === component.children[i]) {
 
 							component.children[i] = components[j]; // Replace guid with object
-
-							// Set parallelizedPreventChange flag inside components inside parallelized sections
-							if (component.parallelizedPreventChange) {
-								component.children[i].parallelizedPreventChange = true;
-							}
 
 							if (component.children[i].children.length > 0) {
 								component.children[i].expanded = true;
@@ -394,7 +391,6 @@ export default {
 
 			if (item.isNew) {
 
-				console.log(item);
 				let	position = 0;
 				if (item.eventTargetType === "sibling") {
 					position = item.newSibling.position + 1;
@@ -413,11 +409,10 @@ export default {
 				if (item.eventTargetType === "child") {
 
 					const childrenInParent = this.findNumItemsInNode(newParent);
-					newPosition = newParent.position + childrenInParent;
+					newPosition = newParent.position + childrenInParent + 1;
 
 				} else if (item.eventTargetType === "sibling") {
 					newPosition = item.newSibling.position + 1;
-					console.log("NEWPPOS", newPosition);
 				} else {
 					newPosition = 0;
 				}
@@ -512,7 +507,7 @@ export default {
 				roadmapGuid: this.roadmap.guid,
 				items,
 				newParentGuid,
-				index: newPosition
+				index: newPosition + 1,
 			};
 
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
@@ -579,7 +574,7 @@ export default {
 				this.errors.push("Invalid progress value.");
 			}
 
-			if (!this.errors.length) {
+			if (!this.errors.length) {			
 				this.updateComponent(this.currentComponent);
 				this.editorShown = false;
 				this.currentComponent = {};
@@ -764,9 +759,8 @@ export default {
 				if (newComponents[i].position === newComponents[i+1].position) {
 					if (newComponents[i].type === "SE" && newComponents[i+1].type === "SE") {
 						newComponents[i].parallelized = true;
-						newComponents[i].parallelizedPreventChange = true;
 						newComponents[i+1].parallelized = true;
-						newComponents[i+1].parallelizedPreventChange = true;
+						newComponents[i].parallelizedPreventChange = true;
 					}
 				}
 			}
@@ -776,6 +770,7 @@ export default {
 
 	async fetch() {
 		// Get list of roadmaps
+		
 		this.roadmaps = await this.$axios.$get("/api/roadmaps")
 		.catch(err => console.log(err));
 	},

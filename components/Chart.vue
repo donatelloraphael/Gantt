@@ -670,19 +670,8 @@ export default {
 
 				[ calculatedProgress, actualProgress ] = refreshProgress(components[i]);
 
-				let numChildren = 0;
-				for (let j = 0, length = components[i].children.length; j < length; j++) {
-					if (components[i].children[j].calculatedProgress) {
-						numChildren++;
-					}
-				}
-				console.log(`${components[i].position} - ${numChildren}`);
-				if (numChildren === 0) {
-					numChildren = 1;
-				}
-
-				components[i].calculatedProgress = calculatedProgress / numChildren;
-				components[i].progress = actualProgress / numChildren;
+				components[i].calculatedProgress = calculatedProgress;
+				components[i].progress = actualProgress;
 				cumulativeProgress += components[i].calculatedProgress;
 				if(components[i].calculatedProgress) {
 					numOfComponents++;

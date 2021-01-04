@@ -612,8 +612,6 @@ export default {
 				updateComponent.roadmapGuid = this.roadmap.guid;
 			}
 
-			console.log(updateComponent);
-
 			this.$axios.$put(`/api/roadmaps/${this.roadmap.guid}/${typeLong}s/${component.guid}`, updateComponent)
 			.then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));
@@ -672,7 +670,13 @@ export default {
 
 				[ calculatedProgress, actualProgress ] = refreshProgress(components[i]);
 
-				let numChildren = components[i].children ? components[i].children.length : 1;
+				let numChildren = 0;
+				for (let j = 0, length = components[i].children.length; j < length; j++) {
+					if (components[i].children[j].calculatedProgress) {
+						numChildren++;
+					}
+				}
+				console.log(`${components[i].position} - ${numChildren}`);
 				if (numChildren === 0) {
 					numChildren = 1;
 				}
@@ -691,23 +695,21 @@ export default {
 
 			function refreshProgress(component) {
 
-				let numChildren;
+				let numChildren = 0;
 				let calculatedSum = 0, actualSum = 0;
 				if (component.children && component.children.length) {
 					for (let i = 0, length = component.children.length; i < length; i++) {
 						let [ calculatedProgress, actualProgress ] = refreshProgress(component.children[i]);
-						numChildren = component.children ? component.children.length : 1;
-						if (numChildren === 0) {
-							numChildren = 1;
+						if(calculatedProgress > 0) {
+							numChildren++;
 						}
 
 						calculatedSum += calculatedProgress;
 						actualSum += actualProgress;
 
-						let actionCalculatedProgress = 0;
-						let actionActualProgress = component.progress || 0;
-
 						if (component.type === "AC") {
+							let actionCalculatedProgress = 0;
+							let actionActualProgress = component.progress || 0;
 							
 							let estimatedDuration = component.estimatedDuration * 60 * 1000;
 
@@ -723,11 +725,14 @@ export default {
 				  		if (PROGRESS_TEST) {
 				  			actionActualProgress = Math.round(actionCalculatedProgress / 2);
 				  		}
+				  		numChildren++;
 
-							numChildren++;
 							calculatedSum += actionCalculatedProgress;
 							actualSum += actionActualProgress;
 						}						
+					}
+					if (numChildren === 0) {
+						numChildren = 1;
 					}
 					component.calculatedProgress = Math.round(calculatedSum / numChildren);
 					component.progress = Math.round(actualSum / numChildren);
@@ -792,7 +797,6 @@ export default {
     });
 
     this.$nuxt.$on("componentcheck", item => {
-    	console.log("CHECKED", this.checkedComponents);
     	this.populateChecked(item);
     });
 

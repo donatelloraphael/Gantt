@@ -519,21 +519,21 @@ export default {
 		// Moves components to a new position
 		moveComponents(items, newPosition, newParentGuid ) {
 			// Adds the checked components to item array and removes duplicates
-			const componentsToMove = new Set(items);
-			for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
-				componentsToMove.add(this.checkedComponents[i].guid);
+			if (this.checkedComponents.length) {
+				items = [];
+				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
+					items.push(this.checkedComponents[i].guid);
+				}
 			}
-			items = Array.from(componentsToMove);
 
 			const body = {
 				roadmapGuid: this.roadmap.guid,
 				items,
 				newParentGuid,
-				index: newPosition,
+				index: newPosition + 1,
 			};
-			console.log("IN", body.index);
-			console.log(items);
 
+			console.log(newPosition)
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
 			.then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));

@@ -12,7 +12,7 @@
 
   	</div>
   	
-    <div class="drop-zone" @drop="onDropSibling($event)" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';"></div>
+    <div class="drop-zone" @drop="onDropSibling($event)" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';" @click="log()"></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
       <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue" :selectedguid="selectedguid"></block>
@@ -48,7 +48,7 @@ import Alea from "alea";
 	  	};
 	  },
 	  computed: {
-	  	// Derived color of componentd based on their types
+	  	// Derived color of component based on their types
 	  	calcColor() {
 	  		if (this.block.parallelized) {
 	  			const prng = new Alea(this.block.position);
@@ -93,9 +93,9 @@ import Alea from "alea";
 	    	}
 	    },
 
-	    // log() {
-	    // 	console.log(this.block);
-	    // },
+	    log() {
+	    	console.log(this.block);
+	    },
 
 	    // emit component check events
 	    emitComponent() {

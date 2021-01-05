@@ -529,8 +529,10 @@ export default {
 				roadmapGuid: this.roadmap.guid,
 				items,
 				newParentGuid,
-				index: newPosition + 1, // Needs to add 1 to index to get correct position
+				index: newPosition,
 			};
+			console.log("IN", body.index);
+			console.log(items);
 
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
 			.then(() => this.getRoadmap(this.roadmap.guid))
@@ -645,33 +647,33 @@ export default {
 
 		// Changes the individual day and time values in to form that can be saved in API.
 
-		// transformComponentForSaving(component) {
-		// 	const NUM_MINUTES_IN_DAY = 1440;
+		transformComponentForSaving(component) {
+			const NUM_MINUTES_IN_DAY = 1440;
 
-		// 	let hours = 0, minutes = 0, seconds = 0;
+			let hours = 0, minutes = 0, seconds = 0;
 
-		// 	let [year, month, date]  = component.startDate ? component.startDate.split("-") : [0, 0, 0];
-		// 	[hours, minutes, seconds] = component.startTime ? component.startTime.split(":") : [0, 0, 0];
+			let [year, month, date]  = component.startDate ? component.startDate.split("-") : [0, 0, 0];
+			[hours, minutes, seconds] = component.startTime ? component.startTime.split(":") : [0, 0, 0];
 
-		// 	if (month < 1 ) {
-		// 		month = 0;
-		// 	} else {
-		// 		month -= 1;
-		// 	}
+			if (month < 1 ) {
+				month = 0;
+			} else {
+				month -= 1;
+			}
 
-		// 	const newDate = new Date(year, month, date, hours, minutes, seconds);
+			const newDate = new Date(year, month, date, hours, minutes, seconds);
 
-		// 	if (year && month && date) {
-		// 		component.startDateTime = newDate.getTime();
-		// 	}
+			if (year && month && date) {
+				component.startDateTime = newDate.getTime();
+			}
 
-		// 	if (this.currentComponent.estDays || this.currentComponent.estHours || this.currentComponent.estMinutes) {
-		// 		component.estimatedDuration = this.currentComponent.estDays * NUM_MINUTES_IN_DAY + this.currentComponent.estHours * 60 + parseInt(this.currentComponent.estMinutes);
-		// 	}
+			if (this.currentComponent.estDays || this.currentComponent.estHours || this.currentComponent.estMinutes) {
+				component.estimatedDuration = this.currentComponent.estDays * NUM_MINUTES_IN_DAY + this.currentComponent.estHours * 60 + parseInt(this.currentComponent.estMinutes);
+			}
 
-		// 	component.progress = parseInt(component.progress);
-		// 	return component;
-		// },
+			component.progress = parseInt(component.progress);
+			return component;
+		},
 
 		// Set mock data for progress demo ////////////////////////////////
 		setTestData(components) {

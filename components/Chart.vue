@@ -51,7 +51,7 @@
 
 		<div class="edit-panel" v-if="editorShown">
 
-			<div class="edit-name">
+			<div class="edit-name" :style="{backgroundColor: currentTypeColor}">
 				<h2>{{ currentComponent.code }}</h2>
 			</div>
 
@@ -155,9 +155,23 @@ export default {
 			mlHue: 100,
 		};
 	},
+
 	components: {
 		Block,
 	},
+
+	computed: {
+		currentTypeColor() {
+			switch(this.currentComponent.type) {
+				case "PH": return "hsl(199, 53%, 58%)";
+				case "SE": return "hsl(39, 53%, 58%)";
+				case "AC": return "hsl(258, 53%, 58%)";
+				case "ML": return "hsl(100, 53%, 58%)";
+				default: return "#1082ed";
+			}
+		},
+	},
+
 	watch: {
 		// Transform roadmap components in to a recursive-able form
 		roadmapChanged() {
@@ -192,6 +206,7 @@ export default {
 			}
 		},
 	},
+
 	methods: {
 		async createRoadmap() {
 			const title = this.roadmapTitle;
@@ -503,11 +518,18 @@ export default {
 
 		// Moves components to a new position
 		moveComponents(items, newPosition, newParentGuid ) {
+			// Adds the checked components to item array and removes duplicates
+			const componentsToMove = new Set(items);
+			for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
+				componentsToMove.add(this.checkedComponents[i].guid);
+			}
+			items = Array.from(componentsToMove);
+
 			const body = {
 				roadmapGuid: this.roadmap.guid,
 				items,
 				newParentGuid,
-				index: newPosition + 1,
+				index: newPosition + 1, // Needs to add 1 to index to get correct position
 			};
 
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
@@ -517,6 +539,10 @@ export default {
 
 		// Maintains an array of checked components
 		populateChecked(item) {
+			// clear selected component
+			this.currentComponent = {};
+			this.editorShown = false;
+
 			if (item.checked) {
 				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
 					if (this.checkedComponents[i].guid === item.component.guid) {
@@ -539,6 +565,7 @@ export default {
 			}
 		},
 
+		// Parallelize Sections
 		parallelize() {
 			const sectionsGuid = [];
 
@@ -553,6 +580,7 @@ export default {
 			}).then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));
 
+			// Clears state
 			this.parallelizeAvailable = false;
 			this.checkedComponents.length = 0;
 		},
@@ -581,6 +609,7 @@ export default {
 			}
 		},
 
+		// Updates selected component
 		updateComponent(component) {
 			let typeLong;
 
@@ -612,33 +641,37 @@ export default {
 			.catch(err => console.log(err));
 		},
 
-		transformComponentForSaving(component) {
-			const NUM_MINUTES_IN_DAY = 1440;
+		// TODO: This code is for when implementing adding of startDateTime, estimatedDuration, and progress for Actions. It is not yet implemented
 
-			let hours = 0, minutes = 0, seconds = 0;
+		// Changes the individual day and time values in to form that can be saved in API.
 
-			let [year, month, date]  = component.startDate ? component.startDate.split("-") : [0, 0, 0];
-			[hours, minutes, seconds] = component.startTime ? component.startTime.split(":") : [0, 0, 0];
+		// transformComponentForSaving(component) {
+		// 	const NUM_MINUTES_IN_DAY = 1440;
 
-			if (month < 1 ) {
-				month = 0;
-			} else {
-				month -= 1;
-			}
+		// 	let hours = 0, minutes = 0, seconds = 0;
 
-			const newDate = new Date(year, month, date, hours, minutes, seconds);
+		// 	let [year, month, date]  = component.startDate ? component.startDate.split("-") : [0, 0, 0];
+		// 	[hours, minutes, seconds] = component.startTime ? component.startTime.split(":") : [0, 0, 0];
 
-			if (year && month && date) {
-				component.startDateTime = newDate.getTime();
-			}
+		// 	if (month < 1 ) {
+		// 		month = 0;
+		// 	} else {
+		// 		month -= 1;
+		// 	}
 
-			if (this.currentComponent.estDays || this.currentComponent.estHours || this.currentComponent.estMinutes) {
-				component.estimatedDuration = this.currentComponent.estDays * NUM_MINUTES_IN_DAY + this.currentComponent.estHours * 60 + parseInt(this.currentComponent.estMinutes);
-			}
+		// 	const newDate = new Date(year, month, date, hours, minutes, seconds);
 
-			component.progress = parseInt(component.progress);
-			return component;
-		},
+		// 	if (year && month && date) {
+		// 		component.startDateTime = newDate.getTime();
+		// 	}
+
+		// 	if (this.currentComponent.estDays || this.currentComponent.estHours || this.currentComponent.estMinutes) {
+		// 		component.estimatedDuration = this.currentComponent.estDays * NUM_MINUTES_IN_DAY + this.currentComponent.estHours * 60 + parseInt(this.currentComponent.estMinutes);
+		// 	}
+
+		// 	component.progress = parseInt(component.progress);
+		// 	return component;
+		// },
 
 		// Set mock data for progress demo ////////////////////////////////
 		setTestData(components) {
@@ -652,10 +685,12 @@ export default {
 			}
 		},
 
+		// Set progress percentage values of the components
 		handleProgress(components) {
 			let cumulativeProgress = 0;
 			let numOfComponents = 0;
 
+			// Loop deals with top level components
 			for (let i = 0, length = components.length; i < length; i++) {
 
 				components[i].calculatedProgress = 0;
@@ -675,15 +710,19 @@ export default {
 			if (numOfComponents === 0) {
 				numOfComponents = 1;
 			}
+			// Progress of the whole roadmap
 			this.averageProgress = cumulativeProgress / numOfComponents;
 
+			// Recursive function that steps through each nested component and sets its progress values
 			function refreshProgress(component) {
 
 				let numChildren = 0;
 				let calculatedSum = 0, actualSum = 0;
+				// If a component has children
 				if (component.children && component.children.length) {
 					for (let i = 0, length = component.children.length; i < length; i++) {
 						let [ calculatedProgress, actualProgress ] = refreshProgress(component.children[i]);
+						// If a component has set progress property, increment the number of active children
 						if(calculatedProgress > 0) {
 							numChildren++;
 						}
@@ -691,6 +730,7 @@ export default {
 						calculatedSum += calculatedProgress;
 						actualSum += actualProgress;
 
+						// If component is of Action type and has children itself
 						if (component.type === "AC") {
 							let actionCalculatedProgress = 0;
 							let actionActualProgress = component.progress || 0;
@@ -715,12 +755,15 @@ export default {
 							actualSum += actionActualProgress;
 						}						
 					}
+					// To prevent division by zero
 					if (numChildren === 0) {
 						numChildren = 1;
 					}
+					// Saves the progress to the component
 					component.calculatedProgress = Math.round(calculatedSum / numChildren);
 					component.progress = Math.round(actualSum / numChildren);
 
+					// If the component is of type Action and has no children. Only actions have progress values itself. All the other components inherit the progress values from sub-components.
 				} else if (component.type === "AC") {
 
 					let calculatedProgress = 0;
@@ -748,11 +791,13 @@ export default {
 			return components;
 		},
 
+		// Sets a component if selected
 		componentSelected(component) {
 			this.currentComponent = component;
 			this.editorShown = true;
 		},
 
+		// Sets the parallelized flag on parallelized components
 		setParallelized(components) {
 			const newComponents = this.sortByPosition(components);
 			for (let i = 0, length = newComponents.length; i < length - 1; i++) {
@@ -760,17 +805,18 @@ export default {
 					if (newComponents[i].type === "SE" && newComponents[i+1].type === "SE") {
 						newComponents[i].parallelized = true;
 						newComponents[i+1].parallelized = true;
+						// Sets a flag to prevent adding a component between parallelized blocks. This is not needed for the last component of a parallelized block.
 						newComponents[i].parallelizedPreventChange = true;
 					}
 				}
 			}
 			return newComponents;
-		}
+		},
 	},
 
+	// Get initial data
 	async fetch() {
 		// Get list of roadmaps
-		
 		this.roadmaps = await this.$axios.$get("/api/roadmaps")
 		.catch(err => console.log(err));
 	},
@@ -788,14 +834,14 @@ export default {
     	this.componentSelected(component);
     });
 
+    // Sets ticks at specific intervals to set progress of components
     let progressInterval = setInterval(() => {
     	this.components.children = this.handleProgress(this.components.children);
     }, 500);
 	},
 
 	beforeDestroy() {
-		// clearInterval(progressInterval);
-
+		// Clear event watchers on event bus
     this.$nuxt.$off("triggerdrop");
     this.$nuxt.$off("componentcheck");
     this.$nuxt.$off("componentselected");
@@ -1057,6 +1103,7 @@ ul.blocks {
 	font-size: 1rem;
 	padding: 13px 0 14px 15px;
 	background-color: #1082ed;
+	min-height: 70px;
 	color: white;
 }
 
@@ -1244,6 +1291,10 @@ button.negative:hover {
 	}
 	.edit-panel {
 		grid-column: span 3;
+	}
+
+	.edit-body select {
+		width: 100%;
 	}
 }
 

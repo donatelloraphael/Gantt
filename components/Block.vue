@@ -12,7 +12,7 @@
 
   	</div>
   	
-    <div class="drop-zone" @drop="onDropSibling($event)" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';" @click="log()"></div>
+    <div class="drop-zone" @drop="onDropSibling($event); log();" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';" @click="log()"></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
       <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue" :selectedguid="selectedguid"></block>
@@ -94,7 +94,7 @@ import Alea from "alea";
 	    },
 
 	    log() {
-	    	console.log(this.block);
+	    	console.log("CURRENT COMPONENT: ", this.block);
 	    },
 
 	    // emit component check events
@@ -155,6 +155,10 @@ import Alea from "alea";
 
 	    	// Prevent dropping an item in to itself or its children or its direct parent
 				if (component.guid === newParentGuid) {
+	    		return;
+	    	}
+	    	// Prevent dropping an item to its own drop zone
+	    	if (component.guid === this.block.guid) {
 	    		return;
 	    	}
 

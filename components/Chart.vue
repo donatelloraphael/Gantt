@@ -468,6 +468,7 @@ export default {
 				newComponent.status = "Created";
 				newComponent.progress = 0;
 			}
+			console.log("NEW POSITION: ", newPosition);
 
 			// Saves created component to backend and updates local copy of the component
 			const createdComponentGuid = await this.$axios.$post(`/api/roadmaps/${this.roadmap.guid}/${newComponent.typeLong}s`, newComponent)
@@ -518,22 +519,25 @@ export default {
 
 		// Moves components to a new position
 		moveComponents(items, newPosition, newParentGuid ) {
-			// Adds the checked components to item array and removes duplicates
+			// Adds the checked components to item array if items exists in it
 			if (this.checkedComponents.length) {
 				items = [];
 				for (let i = 0, length = this.checkedComponents.length; i < length; i++) {
 					items.push(this.checkedComponents[i].guid);
 				}
 			}
+			console.log("MOVING ITEMS: ", items);
 
 			const body = {
 				roadmapGuid: this.roadmap.guid,
 				items,
 				newParentGuid,
-				index: newPosition + 1,
+				index: newPosition + parseInt(process.env.NUXT_ENV_POSITION_CONSTANT),
 			};
+			console.log("INDEX: ", body.index);
 
-			console.log(newPosition)
+			this.checkedComponents = [];
+
 			this.$axios.$put(`/api/roadmaps/${body.roadmapGuid}/Move`, body)
 			.then(() => this.getRoadmap(this.roadmap.guid))
 			.catch(err => console.log(err));

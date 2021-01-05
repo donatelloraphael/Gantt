@@ -5,14 +5,14 @@
 	  	<span v-if="!block.children.length && block.code" class="placeholder"></span>
 	  	<span class="sign" v-if="block.children.length && block.code" @click="expand(); toggleSign();">{{ sign }}</span>
 
-	    <span class="block" :class="{ 'highlight-selected': currentComponentSelected, highlight: dragOver, parallelized: block.parallelized, 'checked-highlight': isChecked }" @click="emitSelected()" v-if="block.guid" draggable
-	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver=true" @dragleave="dragOver=false" @mouseleave="dragOver=false" :style="{'background-color': `${calcColor}`, width: `${blockWidth}px`}" :key="blockWidth">{{ this.block.code }}
+	    <span class="block" :class="{ 'highlight-selected': currentComponentSelected, highlight: dragOver, parallelized: block.parallelized }" @click="emitSelected()" v-if="block.guid" draggable
+	    @dragstart="startDrag($event)" @drop="onDropChild($event)" @dragenter="dragOver=true" @dragleave="dragOver=false" @mouseleave="dragOver=false":style="{'background-color': `${calcColor}`, width: `${blockWidth}px`}" :key="blockWidth">{{ this.block.code }}
 	  		<span class="progress">{{ calculatedProgress }}%</span>
 			</span>
 
   	</div>
   	
-    <div class="drop-zone" @drop="onDropSibling($event)" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';" @click="log()"></div>
+    <div class="drop-zone" @drop="onDropSibling($event); log()" ondragover="this.style.backgroundColor='#f2e721';" onmouseleave="this.style.backgroundColor='#F2F2F2';" ondragleave="this.style.backgroundColor='#F2F2F2';"  @click="log()" ></div>
 
     <ul class="sub-blocks" v-if="block.children && block.children.length > 0" v-show="block.expanded">
       <block v-for="(child, index) in block.children" :block="child" :component="currentComponent" :key="index" :achue="acHue" :sehue="seHue" :phhue="phHue" :mlhue="mlHue" :selectedguid="selectedguid"></block>
@@ -39,16 +39,14 @@ import Alea from "alea";
 	  		sign: "–",
 	  		type: this.block.type,
 	  		dragOver: false,
-	  		isChecked: false,
-	  		// Hue values of component types
 	  		acHue: this.achue - 10,
 	  		seHue: this.sehue - 10,
 	  		phHue: this.phhue - 10,
 	  		mlHue: this.mlhue - 10,
+	  		isChecked: false,
 	  	};
 	  },
 	  computed: {
-	  	// Derived color of component based on their types
 	  	calcColor() {
 	  		if (this.block.parallelized) {
 	  			const prng = new Alea(this.block.position);
@@ -69,7 +67,6 @@ import Alea from "alea";
 			currentComponent() {
 				return this.component;
 			},
-			// Block width changes based on calculated progress and indentation level of the component.
 			blockWidth() {
 				return (this.block.calculatedProgress * 600 / 100) + 130 + (this.block.indentationLevel * 20);
 			},
@@ -97,17 +94,14 @@ import Alea from "alea";
 	    	console.log(this.block);
 	    },
 
-	    // emit component check events
 	    emitComponent() {
 	    	$nuxt.$emit("componentcheck", { checked: this.isChecked, component: this.block });
 	    },
 
-	    // emit details of selected component
 	    emitSelected() {
 	    	$nuxt.$emit("componentselected", this.block);
 	    },
 
-	    // Sets the details of the component being dragged
 	    startDrag(e) {
 	    	e.dataTransfer.dropEffect = "move";
       	e.dataTransfer.effectAllowed = "move";
@@ -129,7 +123,6 @@ import Alea from "alea";
 	    	this.triggerDrop(e, "sibling");
 	    },
 
-	    // Function to handle different types of component drops
 	    triggerDrop(e, eventTargetType) {
 
 	    	const component = e.dataTransfer.getData("component") ? JSON.parse(e.dataTransfer.getData("component")) : {};
@@ -149,7 +142,7 @@ import Alea from "alea";
 	    		newSibling = this.block;
 	    		if (!this.block.code) {
 	    			eventTargetType = "root";
-	    			newParentGuid = "00000000-0000-0000-0000-000000000000";
+	    			newParentGuid = "00000000-0000-0000-0000-000000000000"
 	    		}
 	    	}
 
@@ -175,6 +168,11 @@ import Alea from "alea";
 					if (this.block.parallelizedPreventChange) {
 		    		return;
 		    	}
+	    	}
+
+	    	// Prevent moving Parallelized sections
+	    	if (component.parallelized) {
+	    		return;
 	    	}
 
 	    	const item = {
@@ -282,10 +280,6 @@ import Alea from "alea";
 	.parallelized {
 		font-style: italic;
 		text-decoration: underline;
-	}
-
-	.checked-highlight {
-		border: 2px solid #00d4ff !important;
 	}
 
 </style>
